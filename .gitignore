@@ -1,0 +1,57 @@
+# Shared secrets everywhere
+**/.env
+**/.env.*
+!**/.env.example
+**/auth.json
+**/*.pem
+**/*.key
+**/*.crt
+**/*.p12
+**/*.pfx
+**/*service-account*.json
+**/*firebase*admin*.json
+**/*google-services.json
+**/*GoogleService-Info.plist
+
+# Laravel backend generated files
+/backend-temp/vendor/
+/backend-temp/node_modules/
+/backend-temp/public/build/
+/backend-temp/public/hot/
+/backend-temp/public/storage/
+/backend-temp/storage/*.key
+/backend-temp/storage/pail/
+/backend-temp/bootstrap/cache/*.php
+/backend-temp/storage/logs/*.log
+
+# Flutter generated files
+/mobile/node_modules/
+/mobile/.dart_tool/
+/mobile/.idea/
+/mobile/.gradle/
+/mobile/build/
+/mobile/android/.gradle/
+/mobile/android/app/build/
+/mobile/android/build/
+/mobile/ios/Pods/
+/mobile/ios/.symlinks/
+/mobile/ios/Flutter/ephemeral/
+
+# Explicit Firebase protection
+/mobile/android/app/google-services.json
+/mobile/ios/Runner/GoogleService-Info.plist
+
+# IDE and OS
+.fleet/
+.idea/
+.nova/
+.vscode/
+.zed/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.temp
+*.swp
+*~

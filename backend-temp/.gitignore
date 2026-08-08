@@ -1,0 +1,31 @@
+# Laravel local secrets
+.env
+.env.*
+!.env.example
+/auth.json
+
+# Dependencies
+/vendor
+/node_modules
+
+# Generated files
+/public/build
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/bootstrap/cache/*.php
+/storage/logs/*.log
+.phpunit.result.cache
+.phpunit.cache
+
+# Local tools
+/.idea
+/.vscode
+/.fleet
+/.nova
+/.zed
+
+# OS files
+.DS_Store
+Thumbs.db
