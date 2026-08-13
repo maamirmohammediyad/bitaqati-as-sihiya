@@ -89,8 +89,8 @@ class PatientAccountScreen extends ConsumerWidget {
                     title: const Text('تغيير كلمة المرور'),
                     trailing: const Icon(Icons.chevron_left_rounded),
                     onTap: () {
-                      context.push('/settings');
-                    },
+  context.push('/patient/change-password');
+},
                   ),
                   const Divider(height: 1),
                   ListTile(
@@ -98,8 +98,8 @@ class PatientAccountScreen extends ConsumerWidget {
                     title: const Text('تعديل معلومات الحساب'),
                     trailing: const Icon(Icons.chevron_left_rounded),
                     onTap: () {
-                      context.push('/settings');
-                    },
+  context.push('/patient/edit-account');
+},
                   ),
                 ],
               ),

@@ -7,6 +7,7 @@ use App\Domain\Enums\FileType;
 use Illuminate\Validation\Rule;
 use App\Domain\Actions\Patient\CompleteProfileAction;
 use App\Domain\Models\PatientProfile;
+use App\Domain\Enums\UserRole;
 use App\Domain\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Patient\CompleteProfileRequest;
@@ -362,6 +363,33 @@ public function markGuardianEmergencyAsRead(
             'is_read' => true,
             'read_at' => $read->read_at?->toIso8601String(),
         ],
+    ]);
+}
+public function updateMyEmail(Request $request): JsonResponse
+{
+    /** @var User $user */
+    $user = $request->user();
+
+    if ($user->role !== UserRole::Patient) {
+        abort(403, 'هذه العملية متاحة للمريض فقط.');
+    }
+
+    $data = $request->validate([
+        'email' => [
+            'required',
+            'email',
+            'max:255',
+            Rule::unique('users', 'email')->ignore($user->id),
+        ],
+    ]);
+
+    $user->update([
+        'email' => strtolower(trim($data['email'])),
+    ]);
+
+    return response()->json([
+        'message' => 'تم حفظ البريد الإلكتروني بنجاح.',
+        'data' => new UserResource($user->fresh()),
     ]);
 }
 }

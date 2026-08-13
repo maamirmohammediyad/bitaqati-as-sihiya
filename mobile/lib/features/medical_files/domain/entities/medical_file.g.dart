@@ -8,9 +8,9 @@ part of 'medical_file.dart';
 
 _$MedicalFileImpl _$$MedicalFileImplFromJson(Map<String, dynamic> json) =>
     _$MedicalFileImpl(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      originalName: json['original_name'] as String,
+      id: _stringFromJson(json['id']),
+      userId: _stringFromJson(json['user_id']),
+      originalName: _originalNameFromJson(json['original_name']),
       storagePath: json['storage_path'] as String?,
       fileType: json['file_type'] as String?,
       description: json['description'] as String?,

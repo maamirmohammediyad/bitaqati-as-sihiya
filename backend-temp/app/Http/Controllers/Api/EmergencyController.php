@@ -83,31 +83,33 @@ public function cancel(string $id, Request $request): JsonResponse
         'message' => 'تم إلغاء نداء الطوارئ وحذفه.',
     ]);
 }
-public function checkIn(string $id, Request $request): JsonResponse
+public function checkIn(Request $request, string $id)
 {
-    $staff = $request->user();
+    $hospitalId = $request->attributes->get('hospital_id');
 
-    $hospital = $staff->hospitals()
-        ->wherePivot('is_active', true)
-        ->first();
+    if ($hospitalId === null) {
+        return response()->json([
+            'message' => 'تعذر تحديد المستشفى.',
+        ], 403);
+    }
 
-    abort_unless($hospital !== null, 403, 'هذا الحساب غير مرتبط بمستشفى نشط.');
+    $event = EmergencyEvent::query()->findOrFail($id);
 
-    $event = EmergencyEvent::query()
-        ->where('id', $id)
-        ->where('status', 'active')
-        ->firstOrFail();
+    if ($event->status !== 'active') {
+        return response()->json([
+            'message' => 'لا يمكن تسجيل وصول هذه الحالة.',
+        ], 422);
+    }
 
     $event->update([
         'status' => 'checked_in',
-        'checked_in_hospital_id' => $hospital->id,
+        'checked_in_hospital_id' => $hospitalId,
         'checked_in_at' => now(),
     ]);
 
     return response()->json([
-        'data' => new EmergencyEventResource(
-            $event->fresh()->load('checkedInHospital'),
-        ),
+        'message' => 'تم تسجيل وصول المريض بنجاح.',
+        'data' => $event->fresh(),
     ]);
 }
     public function history(Request $request): JsonResponse

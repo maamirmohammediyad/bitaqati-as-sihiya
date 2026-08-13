@@ -12,14 +12,28 @@ class PatientMedicalFilesRemoteDataSourceImpl
 
   PatientMedicalFilesRemoteDataSourceImpl(this.dio);
 
-  @override
-  Future<List<MedicalFile>> getMyMedicalFiles() async {
-    final response = await dio.get(ApiConstants.patientMedicalFiles);
+ @override
+Future<List<MedicalFile>> getMyMedicalFiles() async {
+  final response = await dio.get(ApiConstants.patientMedicalFiles);
 
-    final data = response.data['data'] as List<dynamic>;
-    return data
-        .whereType<Map<String, dynamic>>()
-        .map((e) => MedicalFile.fromJson(e))
-        .toList();
+  if (response.data is! Map) {
+    throw const FormatException('استجابة الملفات الطبية غير صالحة');
   }
+
+  final body = Map<String, dynamic>.from(response.data as Map);
+  final rawFiles = body['data'];
+
+  if (rawFiles is! List) {
+    throw const FormatException('قائمة الملفات الطبية غير صالحة');
+  }
+
+  return rawFiles
+      .whereType<Map>()
+      .map(
+        (item) => MedicalFile.fromJson(
+          Map<String, dynamic>.from(item),
+        ),
+      )
+      .toList();
+}
 }

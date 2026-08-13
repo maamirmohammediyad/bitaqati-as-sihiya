@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:bitaqati_as_sihiya/features/emergency/presentation/providers/current_emergency_provider.dart';
-import 'package:bitaqati_as_sihiya/common/widgets/glass_card.dart';
+
 import 'package:bitaqati_as_sihiya/core/localization/app_localizations.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
+import 'package:bitaqati_as_sihiya/features/emergency/presentation/providers/current_emergency_provider.dart';
 
 class PatientDashboard extends ConsumerStatefulWidget {
   const PatientDashboard({super.key});
@@ -17,15 +17,53 @@ class PatientDashboard extends ConsumerStatefulWidget {
 
 class _PatientDashboardState extends ConsumerState<PatientDashboard> {
   bool _showWelcome = true;
+  bool _hasHandledEmergencyRedirect = false;
 
   @override
   void initState() {
     super.initState();
+
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
-        setState(() => _showWelcome = false);
+        setState(() {
+          _showWelcome = false;
+        });
       }
     });
+  }
+
+  void _handleEmergencyRedirect(String? status) {
+    if (_hasHandledEmergencyRedirect || !mounted) {
+      return;
+    }
+
+    if (status != 'active' && status != 'checked_in') {
+      return;
+    }
+
+    _hasHandledEmergencyRedirect = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      if (status == 'active') {
+        context.go('/sos');
+      } else if (status == 'checked_in') {
+        context.go('/emergency/checked-in');
+      }
+    });
+  }
+
+  Future<void> _logout() async {
+    await ref.read(authProvider.notifier).logout();
+
+    if (!mounted) {
+      return;
+    }
+
+    context.go('/login');
   }
 
   @override
@@ -34,6 +72,7 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final currentEmergencyAsync = ref.watch(currentEmergencyProvider);
+
     if (user == null) {
       return Scaffold(
         appBar: AppBar(
@@ -48,378 +87,494 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
       );
     }
 
+    currentEmergencyAsync.whenData((event) {
+      _handleEmergencyRedirect(event?.status);
+    });
+
+    final userName = user.fullName.trim().isEmpty
+        ? 'المريض'
+        : user.fullName.trim();
+
     final isProfileComplete = user.isProfileComplete;
-    final userName = user.fullName;
-    final nationalId = user.nationalId;
-currentEmergencyAsync.whenData((event) {
-  if (event == null || !mounted) return;
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!mounted) return;
-
-    if (event.status == 'active') {
-      context.go('/sos');
-    }
-
-    if (event.status == 'checked_in') {
-      context.go('/emergency/checked-in');
-    }
-  });
-});
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.home),
+        centerTitle: true,
         actions: [
-          // زر تغيير اللغة
           IconButton(
-            icon: const Icon(Icons.language),
+            tooltip: 'تغيير اللغة',
+            icon: const Icon(Icons.language_rounded),
             onPressed: () {
               ref.read(localeProvider.notifier).toggleLanguage();
             },
           ),
-          // إشعارات (جاهزة لاحقاً)
           IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: فتح شاشة الإشعارات عند تجهيزها
-              // context.go('/notifications');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(localizations.notificationSettings),
-                ),
-              );
-            },
-          ),
-          // زر تسجيل الخروج بدلاً من الإعدادات الفارغة
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await ref.read(authProvider.notifier).logout();
-            },
+            tooltip: 'تسجيل الخروج',
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: _logout,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (_showWelcome) _WelcomeBanner(userName: userName),
-            if (_showWelcome) const SizedBox(height: 12),
-
-            Card(
-  clipBehavior: Clip.antiAlias,
-  child: ListTile(
-    leading: const CircleAvatar(
-      child: Icon(Icons.badge_outlined),
-    ),
-    title: const Text('صحتك تيك'),
-    subtitle: const Text(
-      'عرض بطاقتك الصحية الرقمية ورمز QR',
-    ),
-    trailing: const Icon(Icons.chevron_left_rounded),
-    onTap: () {
-      context.go('/patient/health-card');
-    },
-  ),
-),
-const SizedBox(height: 16),
-
-            // Banner استكمال الملف الصحي
-            if (!isProfileComplete) ...[
-              GlassCard(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.info_outline,
-                              color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              localizations.profileIncompleteMsg,
-                              style: AppTextStyles.bodyMedium,
-                            ),
-                          ),
-                        ],
+      body: SafeArea(
+        child: RefreshIndicator(
+          onRefresh: () async {
+            ref.invalidate(currentEmergencyProvider);
+          },
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                child: _showWelcome
+                    ? Padding(
+                        key: const ValueKey('welcome'),
+                        padding: const EdgeInsets.only(bottom: 18),
+                        child: _WelcomeHeader(userName: userName),
+                      )
+                    : const SizedBox.shrink(
+                        key: ValueKey('welcome-hidden'),
                       ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton(
-                          onPressed: () {
-                            context.push('/patient/complete-profile');
-                          },
-                          child: Text(
-                              localizations.completeProfileButtonLabel),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
-              const SizedBox(height: 16),
-            ] else
-              const SizedBox(height: 16),
 
-            // بطاقة معلومات سريعة أعلى زر SOS
-            GlassCard(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${localizations.nationalIdLabel}: $nationalId',
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                    Text(
-                      isProfileComplete
-                          ? localizations.profileCompleteMsg
-                          : localizations.profileIncompleteMsg,
-                      style: AppTextStyles.caption,
-                    ),
-                    Text(
-                      localizations.todayHealthSummary,
-                      style: AppTextStyles.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // زر SOS
-            ElevatedButton.icon(
-              onPressed: () {
-                context.go('/sos');
-              },
-              icon: const Icon(Icons.warning_amber_rounded, size: 28),
-              label: Text(
-                localizations.sos,
-                style:
-                    AppTextStyles.heading3.copyWith(color: AppColors.white),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: AppColors.white,
-                minimumSize: const Size.fromHeight(56),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // عنوان "ملخص الحالة"
-            Text(
-              localizations.todayHealthSummary,
-              style: AppTextStyles.bodyMedium,
-            ),
-            const SizedBox(height: 24),
-
-            // إجراءات سريعة
-            Text(
-              localizations.quickActions,
-              style: AppTextStyles.heading3,
-            ),
-            const SizedBox(height: 12),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.8,
-              children: [
-                _QuickActionItem(
-                  icon: Icons.warning_amber_rounded,
-                  label: localizations.sos,
-                  color: AppColors.error,
-                  onTap: () {
-                   context.go('/sos');
-                  },
-                ),
-                _QuickActionItem(
-                  icon: Icons.credit_card_rounded,
-                  label: localizations.healthCard,
-                  color: AppColors.primary,
-                  onTap: () {
-                    context.go('/patient/health-card');
-                  },
-                ),
-                _QuickActionItem(
-                  icon: Icons.qr_code_2_rounded,
-                  label: localizations.qrCode, // تأكد أنه موجود في الترجمات، أو ضع نص ثابت مؤقتاً
-                  color: AppColors.primary,
-                  onTap: () {
-                    context.go('/patient/qr');
-                  },
-                ),
-                _QuickActionItem(
-                  icon: Icons.folder_rounded,
-                  label: localizations.medicalRecord,
-                  color: AppColors.secondary,
-                  onTap: () {
-                    context.go('/patient/medical-record');
-                  },
-                ),
-                _QuickActionItem(
-                  icon: Icons.domain_rounded,
-                  label: localizations.hospitals,
-                  color: AppColors.success,
-                  onTap: () {
-                    context.go('/patient/hospitals');
-                  },
-                ),
-                _QuickActionItem(
-                  icon: Icons.assignment_ind_rounded,
-                  label: localizations.completeProfileButtonLabel,
-                  color: AppColors.primary,
+              if (!isProfileComplete) ...[
+                _CompleteProfileBanner(
                   onTap: () {
                     context.push('/patient/complete-profile');
                   },
                 ),
+                const SizedBox(height: 16),
               ],
-            ),
-            const SizedBox(height: 24),
 
-            // النشاط الأخير (placeholder للتسليم)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  localizations.recentActivity,
-                  style: AppTextStyles.heading3,
-                ),
-                TextButton(
-                  onPressed: () {
-                    // لاحقاً: عرض كل النشاطات
-                  },
-                  child: Text(localizations.viewAll),
-                ),
-              ],
-            ),
-          ],
+              _SosButton(
+                onPressed: () {
+                  context.go('/sos');
+                },
+              ),
+              const SizedBox(height: 28),
+
+              Text(
+                localizations.quickActions,
+                style: AppTextStyles.heading3,
+              ),
+              const SizedBox(height: 12),
+
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 1.05,
+                children: [
+                  _DashboardGridItem(
+                    icon: Icons.health_and_safety_outlined,
+                    label: 'بطاقتي الصحية',
+                    description: isProfileComplete
+                        ? 'عرض البطاقة الصحية'
+                        : 'أكمل الملف لتفعيلها',
+                    color: AppColors.primary,
+                    isEnabled: isProfileComplete,
+                    onTap: () {
+                      context.go('/patient/health-card');
+                    },
+                  ),
+                  _DashboardGridItem(
+                    icon: Icons.qr_code_2_rounded,
+                    label: localizations.qrCode,
+                    description: isProfileComplete
+                        ? 'عرض رمز الاستجابة السريع'
+                        : 'أكمل الملف لتفعيله',
+                    color: AppColors.secondary,
+                    isEnabled: isProfileComplete,
+                    onTap: () {
+                      context.go('/patient/qr');
+                    },
+                  ),
+                  _DashboardGridItem(
+                    icon: Icons.folder_copy_outlined,
+                    label: localizations.medicalRecord,
+                    description: 'بياناتك وملفاتك الصحية',
+                    color: AppColors.success,
+                    isEnabled: true,
+                    onTap: () {
+                      context.go('/patient/medical-record');
+                    },
+                  ),
+                  _DashboardGridItem(
+                    icon: Icons.description_outlined,
+                    label: 'ملفاتي الطبية',
+                    description: 'عرض الفحوصات والتقارير',
+                    color: const Color(0xFF8B5CF6),
+                    isEnabled: true,
+                    onTap: () {
+                      context.push('/patient/files');
+                    },
+                  ),
+                  _DashboardGridItem(
+                    icon: Icons.local_hospital_outlined,
+                    label: localizations.hospitals,
+                    description: 'المستشفيات القريبة منك',
+                    color: const Color(0xFF4E7DDB),
+                    isEnabled: true,
+                    onTap: () {
+                      context.go('/patient/hospitals');
+                    },
+                  ),
+                  _DashboardGridItem(
+                    icon: Icons.history_rounded,
+                    label: 'سجل الطوارئ',
+                    description: 'الحالات السابقة',
+                    color: const Color(0xFFB76E00),
+                    isEnabled: true,
+                    onTap: () {
+                      context.push('/emergency/history');
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              _HelpCard(
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'للطوارئ اضغط زر SOS وسيتم إرسال طلب المساعدة.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _WelcomeBanner extends StatelessWidget {
+class _WelcomeHeader extends StatelessWidget {
   final String userName;
-  const _WelcomeBanner({required this.userName});
+
+  const _WelcomeHeader({
+    required this.userName,
+  });
 
   @override
   Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
-    return GlassCard(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            const Icon(Icons.waving_hand_outlined, color: AppColors.primary),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
+
+    return Row(
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.waving_hand_rounded,
+            color: AppColors.primary,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
                 '${localizations.welcomeBack} $userName',
-                style: AppTextStyles.bodyMedium,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.heading3,
               ),
-            ),
-          ],
+              const SizedBox(height: 3),
+              Text(
+                'نتمنى لك يومًا صحيًا وآمنًا',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.grey700,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
 
-class _QuickActionItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
+class _CompleteProfileBanner extends StatelessWidget {
   final VoidCallback onTap;
 
-  const _QuickActionItem({
-    required this.icon,
-    required this.label,
-    required this.color,
+  const _CompleteProfileBanner({
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
+    return Material(
+      color: const Color(0xFFFFF7E8),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: const Color(0xFFFFD890),
             ),
-            child: Icon(icon, color: color, size: 24),
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: AppTextStyles.labelSmall,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE1A8),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.assignment_late_outlined,
+                  color: Color(0xFFC77A00),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'أكمل ملفك الصحي',
+                      style: AppTextStyles.bodyLarge,
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'أكمل بياناتك لتفعيل البطاقة الصحية ورمز QR.',
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 18,
+                color: Color(0xFFC77A00),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _ActivityItem extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
+class _SosButton extends StatelessWidget {
+  final VoidCallback onPressed;
 
-  const _ActivityItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
+  const _SosButton({
+    required this.onPressed,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.grey100,
-              borderRadius: BorderRadius.circular(10),
+    return Semantics(
+      button: true,
+      label: 'طلب مساعدة طارئة SOS',
+      child: SizedBox(
+        height: 70,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            backgroundColor: AppColors.error,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(icon, size: 20, color: AppColors.grey500),
           ),
-          const SizedBox(width: 12),
-          Expanded(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.sos_rounded,
+                size: 32,
+              ),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'SOS — طلب مساعدة',
+                    style: AppTextStyles.heading3.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                  Text(
+                    'للاستخدام في حالات الطوارئ فقط',
+                    style: AppTextStyles.caption.copyWith(
+                      color: Colors.white.withValues(alpha: 0.88),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardGridItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+  final bool isEnabled;
+  final VoidCallback onTap;
+
+  const _DashboardGridItem({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.isEnabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final iconColor = isEnabled ? color : AppColors.grey500;
+
+    final iconBackgroundColor = isEnabled
+        ? color.withValues(alpha: 0.12)
+        : AppColors.grey100;
+
+    final cardColor = isEnabled
+        ? Theme.of(context).colorScheme.surface
+        : AppColors.grey100;
+
+    return Semantics(
+      button: true,
+      enabled: isEnabled,
+      label: isEnabled
+          ? label
+          : '$label غير متاح حتى يتم إكمال الملف الصحي',
+      child: Material(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: isEnabled ? onTap : null,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isEnabled ? AppColors.grey100 : AppColors.grey200,
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: AppTextStyles.bodyLarge),
-                Text(subtitle, style: AppTextStyles.caption),
+                Row(
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: iconBackgroundColor,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: iconColor,
+                        size: 25,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      isEnabled
+                          ? Icons.arrow_back_ios_new_rounded
+                          : Icons.lock_outline_rounded,
+                      size: isEnabled ? 16 : 20,
+                      color: AppColors.grey500,
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: isEnabled ? null : AppColors.grey500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTextStyles.caption.copyWith(
+                    color: isEnabled
+                        ? AppColors.grey700
+                        : AppColors.grey500,
+                  ),
+                ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: AppColors.grey400),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HelpCard extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _HelpCard({
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.grey100,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.help_outline_rounded,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'هل تحتاج إلى مساعدة؟ تعرّف على طريقة استخدام زر الطوارئ.',
+                  style: AppTextStyles.bodySmall,
+                ),
+              ),
+              const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16,
+                color: AppColors.grey500,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

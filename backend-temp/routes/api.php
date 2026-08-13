@@ -54,7 +54,7 @@ Route::get('emergency/{id}', [EmergencyController::class, 'show']);
 Route::get('emergency/guardians', [EmergencyController::class, 'guardians']);
 Route::middleware([
     'auth:sanctum',
-    'role:hospital_admin,hospital_staff',
+    'role:health_worker',
 ])->group(function (): void {
     Route::post(
         'emergency/{id}/check-in',
@@ -67,10 +67,12 @@ Route::middleware([
         Route::post('patient/qr-token', [PatientQrController::class, 'issue']);
         Route::get('patient/qr/{token}', [PatientQrController::class, 'show']);
     });
-
+Route::put(
+    'patient/email',
+    [PatientController::class, 'updateMyEmail'],
+);
     // Patient own medical files
 Route::get('patient/medical-files', [PatientController::class, 'myMedicalFiles']);
-Route::post('patient/medical-files', [PatientController::class, 'uploadMyMedicalFile']);
 
 // Patient emergencies history (للسجل الطبي)
 Route::get('patient/emergencies', [PatientController::class, 'myEmergencies']);
@@ -114,6 +116,15 @@ Route::middleware('auth:sanctum')->group(function (): void {
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('admin/users', [AdminController::class, 'users'])->name('admin.users');
     Route::get('admin/emergency-events', [AdminController::class, 'emergencyEvents']);
+    Route::middleware([
+    'role:health_worker',
+    'hospital.staff:admin,receptionist',
+])->group(function (): void {
+    Route::post(
+        'emergency/{id}/check-in',
+        [EmergencyController::class, 'checkIn'],
+    );
+});
 });
 
 Route::middleware('auth:sanctum')->post('/notifications/register-device', function (Request $request) {

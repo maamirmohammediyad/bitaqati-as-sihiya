@@ -16,6 +16,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Domain\Models\MedicalFile;
+use App\Domain\Enums\HospitalUserRole;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasUuids, Notifiable;
@@ -149,11 +150,26 @@ public function hospitals(): BelongsToMany
         'user_id',
         'hospital_id',
     )
-        ->withPivot(['id', 'role', 'is_active', 'joined_at'])
+        ->using(HospitalUser::class)
+        ->withPivot([
+            'id',
+            'role',
+            'is_active',
+            'joined_at',
+        ])
+        ->withCasts([
+            'role' => HospitalUserRole::class,
+            'is_active' => 'boolean',
+            'joined_at' => 'datetime',
+        ])
         ->withTimestamps();
 }
     protected static function newFactory(): UserFactory
     {
         return UserFactory::new();
     }
+   public function hospitalUsers(): HasMany
+{
+    return $this->hasMany(HospitalUser::class, 'user_id');
+}
 }

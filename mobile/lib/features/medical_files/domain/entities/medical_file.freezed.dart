@@ -21,10 +21,11 @@ MedicalFile _$MedicalFileFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$MedicalFile {
+  @JsonKey(fromJson: _stringFromJson)
   String get id => throw _privateConstructorUsedError;
-  @JsonKey(name: 'user_id')
+  @JsonKey(name: 'user_id', fromJson: _stringFromJson)
   String get userId => throw _privateConstructorUsedError;
-  @JsonKey(name: 'original_name')
+  @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
   String get originalName => throw _privateConstructorUsedError;
   @JsonKey(name: 'storage_path')
   String? get storagePath => throw _privateConstructorUsedError;
@@ -59,9 +60,10 @@ abstract class $MedicalFileCopyWith<$Res> {
   ) = _$MedicalFileCopyWithImpl<$Res, MedicalFile>;
   @useResult
   $Res call({
-    String id,
-    @JsonKey(name: 'user_id') String userId,
-    @JsonKey(name: 'original_name') String originalName,
+    @JsonKey(fromJson: _stringFromJson) String id,
+    @JsonKey(name: 'user_id', fromJson: _stringFromJson) String userId,
+    @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
+    String originalName,
     @JsonKey(name: 'storage_path') String? storagePath,
     @JsonKey(name: 'file_type') String? fileType,
     String? description,
@@ -162,9 +164,10 @@ abstract class _$$MedicalFileImplCopyWith<$Res>
   @override
   @useResult
   $Res call({
-    String id,
-    @JsonKey(name: 'user_id') String userId,
-    @JsonKey(name: 'original_name') String originalName,
+    @JsonKey(fromJson: _stringFromJson) String id,
+    @JsonKey(name: 'user_id', fromJson: _stringFromJson) String userId,
+    @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
+    String originalName,
     @JsonKey(name: 'storage_path') String? storagePath,
     @JsonKey(name: 'file_type') String? fileType,
     String? description,
@@ -257,9 +260,10 @@ class __$$MedicalFileImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$MedicalFileImpl implements _MedicalFile {
   const _$MedicalFileImpl({
-    required this.id,
-    @JsonKey(name: 'user_id') required this.userId,
-    @JsonKey(name: 'original_name') required this.originalName,
+    @JsonKey(fromJson: _stringFromJson) required this.id,
+    @JsonKey(name: 'user_id', fromJson: _stringFromJson) required this.userId,
+    @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
+    required this.originalName,
     @JsonKey(name: 'storage_path') this.storagePath,
     @JsonKey(name: 'file_type') this.fileType,
     this.description,
@@ -274,12 +278,13 @@ class _$MedicalFileImpl implements _MedicalFile {
       _$$MedicalFileImplFromJson(json);
 
   @override
+  @JsonKey(fromJson: _stringFromJson)
   final String id;
   @override
-  @JsonKey(name: 'user_id')
+  @JsonKey(name: 'user_id', fromJson: _stringFromJson)
   final String userId;
   @override
-  @JsonKey(name: 'original_name')
+  @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
   final String originalName;
   @override
   @JsonKey(name: 'storage_path')
@@ -368,9 +373,11 @@ class _$MedicalFileImpl implements _MedicalFile {
 
 abstract class _MedicalFile implements MedicalFile {
   const factory _MedicalFile({
-    required final String id,
-    @JsonKey(name: 'user_id') required final String userId,
-    @JsonKey(name: 'original_name') required final String originalName,
+    @JsonKey(fromJson: _stringFromJson) required final String id,
+    @JsonKey(name: 'user_id', fromJson: _stringFromJson)
+    required final String userId,
+    @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
+    required final String originalName,
     @JsonKey(name: 'storage_path') final String? storagePath,
     @JsonKey(name: 'file_type') final String? fileType,
     final String? description,
@@ -385,12 +392,13 @@ abstract class _MedicalFile implements MedicalFile {
       _$MedicalFileImpl.fromJson;
 
   @override
+  @JsonKey(fromJson: _stringFromJson)
   String get id;
   @override
-  @JsonKey(name: 'user_id')
+  @JsonKey(name: 'user_id', fromJson: _stringFromJson)
   String get userId;
   @override
-  @JsonKey(name: 'original_name')
+  @JsonKey(name: 'original_name', fromJson: _originalNameFromJson)
   String get originalName;
   @override
   @JsonKey(name: 'storage_path')

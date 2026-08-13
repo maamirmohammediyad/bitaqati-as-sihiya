@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
+import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
 import 'package:bitaqati_as_sihiya/features/medical_files/domain/entities/medical_file.dart';
 import 'package:bitaqati_as_sihiya/features/patient/presentation/providers/patient_medical_files_provider.dart';
 
@@ -18,13 +18,40 @@ class PatientFilesScreen extends ConsumerWidget {
       body: filesAsync.when(
         data: (files) => _FilesList(files: files),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
+        error: (error, stackTrace) => Center(
           child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'تعذر تحميل الملفات الطبية.\n$e',
-              style: AppTextStyles.bodyMedium,
-              textAlign: TextAlign.center,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.cloud_off_outlined,
+                  size: 52,
+                  color: AppColors.error,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'تعذر تحميل الملفات الطبية',
+                  style: AppTextStyles.heading3,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'تحقق من اتصال الإنترنت ثم أعد المحاولة.',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: AppColors.grey700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    ref.invalidate(myMedicalFilesProvider);
+                  },
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('إعادة المحاولة'),
+                ),
+              ],
             ),
           ),
         ),
@@ -60,16 +87,22 @@ class _FilesList extends StatelessWidget {
       itemBuilder: (context, index) {
         final file = files[index];
 
-        // createdAt: DateTime → نص منسق
+        final type = file.fileType?.trim().isNotEmpty == true
+            ? file.fileType!
+            : 'ملف طبي';
+
         final createdAt = file.createdAt;
         final createdAtLabel = createdAt != null
-            ? 'تاريخ الرفع: ${createdAt.year}-${createdAt.month.toString().padLeft(2, '0')}-${createdAt.day.toString().padLeft(2, '0')}'
+            ? 'تاريخ الرفع: '
+                  '${createdAt.year}-'
+                  '${createdAt.month.toString().padLeft(2, '0')}-'
+                  '${createdAt.day.toString().padLeft(2, '0')}'
             : null;
 
-        // fileType: String غير nullable عندك
-        final type = (file.description?.trim().isNotEmpty ?? false)
-            ? file.fileType
-            : 'ملف طبي';
+        final details = [
+          type,
+          if (createdAtLabel != null) createdAtLabel,
+        ].join(' • ');
 
         return ListTile(
           leading: const Icon(
@@ -83,12 +116,14 @@ class _FilesList extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: Text(
-            createdAtLabel ?? type ?? 'ملف طبي',
+            details,
             style: AppTextStyles.bodySmall.copyWith(color: AppColors.grey700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
           onTap: () {
-            // لاحقاً: فتح/تحميل الملف عبر storagePath أو URL
+            // لاحقًا: فتح الملف أو تنزيله.
           },
         );
       },

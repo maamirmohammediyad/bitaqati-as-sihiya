@@ -3,6 +3,8 @@ import 'package:bitaqati_as_sihiya/main.dart'; // للوصول إلى navigatorK
 import 'package:bitaqati_as_sihiya/features/auth/domain/entities/user.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/patient_edit_account_screen.dart';
+import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/patient_change_password_screen.dart';
 import 'package:bitaqati_as_sihiya/core/localization/app_localizations.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/screens/login_screen.dart';
@@ -12,7 +14,6 @@ import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/patient
 import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/health_card_screen.dart';
 import 'package:bitaqati_as_sihiya/features/emergency/presentation/screens/sos_screen.dart';
 import 'package:bitaqati_as_sihiya/features/hospitals/presentation/screens/hospitals_screen.dart';
-import 'package:bitaqati_as_sihiya/features/settings/presentation/screens/settings_screen.dart';
 import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/complete_profile_screen.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_dashboard.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_patient_card_screen.dart';
@@ -99,6 +100,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             name: 'patient-complete-profile',
             builder: (context, state) => const CompleteProfileScreen(),
           ),
+          GoRoute(
+  path: '/patient/edit-account',
+  name: 'patientEditAccount',
+  builder: (context, state) => const PatientEditAccountScreen(),
+),
+GoRoute(
+  path: '/patient/change-password',
+  name: 'patientChangePassword',
+  builder: (context, state) => const PatientChangePasswordScreen(),
+),
           GoRoute(
   path: '/patient/qr',
   builder: (context, state) => const PatientQrScreen(),
@@ -216,11 +227,6 @@ GoRoute(
         path: '/sos',
         name: 'sos',
         builder: (context, state) => const SosScreen(),
-      ),
-      GoRoute(
-        path: '/settings',
-        name: 'settings',
-        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

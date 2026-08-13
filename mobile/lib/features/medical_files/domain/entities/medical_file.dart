@@ -2,16 +2,19 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'medical_file.freezed.dart';
 part 'medical_file.g.dart';
-
 @freezed
 class MedicalFile with _$MedicalFile {
   const factory MedicalFile({
+    @JsonKey(fromJson: _stringFromJson)
     required String id,
 
-    @JsonKey(name: 'user_id')
+    @JsonKey(name: 'user_id', fromJson: _stringFromJson)
     required String userId,
 
-    @JsonKey(name: 'original_name')
+    @JsonKey(
+      name: 'original_name',
+      fromJson: _originalNameFromJson,
+    )
     required String originalName,
 
     @JsonKey(name: 'storage_path')
@@ -39,4 +42,11 @@ class MedicalFile with _$MedicalFile {
 
   factory MedicalFile.fromJson(Map<String, dynamic> json) =>
       _$MedicalFileFromJson(json);
+}
+
+String _stringFromJson(dynamic value) => value?.toString() ?? '';
+
+String _originalNameFromJson(dynamic value) {
+  final name = value?.toString().trim() ?? '';
+  return name.isEmpty ? 'ملف طبي' : name;
 }

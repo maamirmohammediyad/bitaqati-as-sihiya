@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace App\Domain\Models;
-
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -66,4 +66,8 @@ class Hospital extends Model
             ->withPivot(['id', 'role', 'is_active', 'joined_at'])
             ->withTimestamps();
     }
+public function hospitalUsers(): HasMany
+{
+    return $this->hasMany(HospitalUser::class, 'hospital_id');
+}
 }
