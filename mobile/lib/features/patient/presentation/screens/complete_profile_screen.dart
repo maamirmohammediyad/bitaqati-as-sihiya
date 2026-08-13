@@ -9,9 +9,14 @@ import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
 import 'package:bitaqati_as_sihiya/core/network/api_client.dart';
 import 'package:bitaqati_as_sihiya/core/constants/api_constants.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
-
+import 'package:bitaqati_as_sihiya/features/guardian/presentation/providers/guardian_providers.dart';
 class CompleteProfileScreen extends ConsumerStatefulWidget {
-  const CompleteProfileScreen({super.key});
+  final String? patientId;
+
+  const CompleteProfileScreen({
+    super.key,
+    this.patientId,
+  });
 
   @override
   ConsumerState<CompleteProfileScreen> createState() =>
@@ -28,10 +33,6 @@ class _CompleteProfileScreenState
   final _heightController = TextEditingController();
   final _weightController = TextEditingController();
 
-  // يمكن حذفها لو لن تستعملها مستقبلاً
-  final _allergiesController = TextEditingController();
-  final _chronicDiseasesController = TextEditingController();
-
   // إدخال كـ tags
   final _allergyInputController = TextEditingController();
   final _chronicInputController = TextEditingController();
@@ -40,61 +41,98 @@ class _CompleteProfileScreenState
   final List<String> _chronicDiseases = [];
 
   bool _isSubmitting = false;
-
-  @override
+@override
 void initState() {
   super.initState();
-  // نؤجل القراءة حتى بعد بناء أول frame
+
   WidgetsBinding.instance.addPostFrameCallback((_) {
-    _initFromExtra();
+    if (mounted) {
+      _loadInitialProfile();
+    }
   });
 }
-
-void _initFromExtra() {
-  final routerState = GoRouterState.of(context);
-  final extra = routerState.extra;
-
-  debugPrint('EXTRA IN COMPLETE PROFILE: $extra');
-
-  // extra متوقَّع يكون Map فيها profile من نوع PatientProfileSummary
-  if (extra is Map<String, Object?> && extra['profile'] != null) {
-    final profile = extra['profile'] as PatientProfileSummary;
-
-    try {
-      // dateOfBirth في الكلاس عندك String? بصيغة yyyy-MM-dd
-      final dobString = profile.dateOfBirth;
-      if (dobString != null && dobString.isNotEmpty) {
-        _dateOfBirth = DateTime.tryParse(dobString);
-      }
-
-      // الجنس
-      _gender = profile.gender;
-
-      // فصيلة الدم
-      _bloodGroup = profile.bloodGroup;
-
-      // الطول (double?) نحوله لنص
-      final height = profile.heightCm;
-      if (height != null) {
-        _heightController.text = height.toString();
-      }
-
-      // الوزن
-      final weight = profile.weightKg;
-      if (weight != null) {
-        _weightController.text = weight.toString();
-      }
-
-      // ملاحظة: PatientProfileSummary لا يحتوي allergies أو chronicDiseases
-      // لذلك نترك _allergies و _chronicDiseases فارغين حالياً
-
-      setState(() {});
-    } catch (e) {
-      debugPrint('Error parsing profile in CompleteProfileScreen: $e');
-    }
+List<String> _splitMedicalItems(String? value) {
+  if (value == null || value.trim().isEmpty) {
+    return [];
   }
+
+  return value
+      .split(',')
+      .map((item) => item.trim())
+      .where((item) => item.isNotEmpty)
+      .toList();
 }
 
+Future<void> _loadInitialProfile() async {
+  final authState = ref.read(authProvider);
+  final isGuardian = authState.isGuardian;
+
+  // المريض يعدّل ملفه الخاص:
+  // في هذا المسار لا نملك patientId من الولي.
+  // اترك الحقول فارغة أو حمّل ملف المريض من endpoint مناسب لاحقًا.
+  if (!isGuardian) {
+    return;
+  }
+void _fillFieldsFromProfile(PatientProfileSummary profile) {
+  final dobString = profile.dateOfBirth;
+
+  _dateOfBirth = dobString == null || dobString.isEmpty
+      ? null
+      : DateTime.tryParse(dobString);
+
+  _gender = profile.gender;
+  _bloodGroup = profile.bloodGroup;
+
+  _heightController.text = profile.heightCm?.toString() ?? '';
+  _weightController.text = profile.weightKg?.toString() ?? '';
+
+  _allergies
+    ..clear()
+    ..addAll(_splitMedicalItems(profile.allergies));
+
+  _chronicDiseases
+    ..clear()
+    ..addAll(_splitMedicalItems(profile.chronicDiseases));
+
+  if (mounted) {
+    setState(() {});
+  }
+}
+  final patientId = widget.patientId;
+
+  if (patientId == null || patientId.isEmpty) {
+    debugPrint('CompleteProfileScreen: patientId is missing.');
+    return;
+  }
+
+  try {
+    final dashboard = await ref
+        .read(guardianRepositoryProvider)
+        .getPatientDashboard(patientId);
+
+    final profile = dashboard.profile;
+
+    if (profile == null) {
+      debugPrint('CompleteProfileScreen: patient profile is missing.');
+      return;
+    }
+
+    _fillFieldsFromProfile(profile);
+  } catch (e, stackTrace) {
+    debugPrint('Error loading guardian patient profile: $e');
+    debugPrintStack(stackTrace: stackTrace);
+
+    if (!mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تعذر تحميل بيانات الملف الطبي للمريض'),
+      ),
+    );
+  }
+}
   Future<void> _pickDateOfBirth() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
@@ -144,97 +182,168 @@ void _initFromExtra() {
       _chronicDiseases.remove(value);
     });
   }
+double? _parseOptionalNumber(TextEditingController controller) {
+  final value = controller.text.trim().replaceAll(',', '.');
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+  if (value.isEmpty) {
+    return null;
+  }
 
-    if (_dateOfBirth == null || _gender == null || _bloodGroup == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('يرجى تعبئة الحقول الأساسية'),
-        ),
-      );
+  return double.tryParse(value);
+}
+Future<void> _submit() async {
+  if (!_formKey.currentState!.validate()) {
+    return;
+  }
+
+  if (_dateOfBirth == null || _gender == null || _bloodGroup == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('يرجى تعبئة الحقول الأساسية'),
+      ),
+    );
+    return;
+  }
+
+  final authState = ref.read(authProvider);
+  final isGuardian = authState.isGuardian;
+
+  final height = _parseOptionalNumber(_heightController);
+  final weight = _parseOptionalNumber(_weightController);
+
+  if (_heightController.text.trim().isNotEmpty && height == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('الطول يجب أن يكون رقمًا صحيحًا'),
+      ),
+    );
+    return;
+  }
+
+  if (_weightController.text.trim().isNotEmpty && weight == null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('الوزن يجب أن يكون رقمًا صحيحًا'),
+      ),
+    );
+    return;
+  }
+
+  if (isGuardian &&
+      (widget.patientId == null || widget.patientId!.isEmpty)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تعذر تحديد المريض المطلوب تعديل ملفه'),
+      ),
+    );
+    return;
+  }
+
+  setState(() => _isSubmitting = true);
+
+  try {
+    final data = <String, dynamic>{
+      'date_of_birth': _dateOfBirth!.toIso8601String().split('T').first,
+      'gender': _gender,
+      'blood_group': _bloodGroup,
+      'height_cm': height,
+      'weight_kg': weight,
+    };
+
+    // لا ترسل null تلقائيًا كي لا تمسح بيانات موجودة
+    // عند تعديل حقل آخر مثل الجنس أو الوزن.
+    if (_allergies.isNotEmpty) {
+      data['allergies'] = _allergies.join(', ');
+    }
+
+    if (_chronicDiseases.isNotEmpty) {
+      data['chronic_diseases'] = _chronicDiseases.join(', ');
+    }
+
+    if (isGuardian) {
+      data['patient_id'] = widget.patientId!;
+    }
+
+    final response = await ref.read(apiClientProvider).dio.post(
+          ApiConstants.completePatientProfile,
+          data: data,
+        );
+
+    debugPrint('Profile update response: ${response.data}');
+
+    if (!mounted) {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    if (isGuardian) {
+      // هذه الشاشة فُتحت عبر pushNamed من PatientDetailsScreen.
+      // true تخبر الصفحة السابقة أن الحفظ نجح.
+      context.pop(true);
+      return;
+    }
 
-    try {
-      final dio = ref.read(apiClientProvider).dio;
+    // للمريض نفسه: حدّث معلومات المستخدم ثم اذهب للرئيسية.
+    await ref.read(authProvider.notifier).refreshCurrentUser();
 
-      // 1) البيانات المشتركة
-      final Map<String, dynamic> data = {
-        'date_of_birth': _dateOfBirth!.toIso8601String(),
-        'gender': _gender,
-        'blood_group': _bloodGroup,
-        'height_cm': int.tryParse(_heightController.text),
-        'weight_kg': int.tryParse(_weightController.text),
-        'allergies': _allergies.isNotEmpty ? _allergies.join(', ') : null,
-        'chronic_diseases':
-            _chronicDiseases.isNotEmpty ? _chronicDiseases.join(', ') : null,
-      };
+    if (!mounted) {
+      return;
+    }
 
-      // 2) نحدد المستخدم الحالي
-      final authState = ref.read(authProvider);
-      final currentUser = authState.user;
+    context.goNamed('patientHome');
 
-      // 3) لو المستخدم ولي، نحاول قراءة patientId من extra
-      final routerState = GoRouterState.of(context);
-final extra = routerState.extra;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم تحديث الملف الطبي بنجاح'),
+      ),
+    );
+  } on DioException catch (e, stackTrace) {
+    debugPrint('Profile update Dio error: ${e.message}');
+    debugPrint('Profile update server response: ${e.response?.data}');
+    debugPrintStack(stackTrace: stackTrace);
 
-final bool isGuardian =
-    currentUser != null && currentUser.role == 'guardian';
+    if (!mounted) {
+      return;
+    }
 
-if (isGuardian &&
-    extra is Map<String, Object?> &&
-    extra['patientId'] is String) {
-  data['patient_id'] = extra['patientId'];
-}
+    final responseData = e.response?.data;
 
-      debugPrint('*** COMPLETE PROFILE DATA ***');
-      debugPrint(data.toString());
+    final message = responseData is Map<String, dynamic>
+        ? (responseData['message']?.toString() ??
+            'تعذر تحديث الملف الطبي')
+        : 'تعذر تحديث الملف الطبي';
 
-      await dio.post(
-        ApiConstants.completePatientProfile,
-        data: data,
-        options: Options(
-          responseType: ResponseType.plain,
-        ),
-      );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  } catch (e, stackTrace) {
+    debugPrint('Profile update error: $e');
+    debugPrintStack(stackTrace: stackTrace);
 
-      if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
-      // توجيه بعد الحفظ
-      if (isGuardian) {
-        context.goNamed('guardianHome');
-      } else {
-        context.goNamed('patientHome');
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('تم تحديث الملف الطبي بنجاح'),
-        ),
-      );
-    } on DioException catch (e, st) {
-      debugPrint('LOCAL DIO ERROR: $e');
-      debugPrint('LOCAL DIO STACK: $st');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('DioException: $e')),
-      );
-    } catch (e, st) {
-      debugPrint('LOCAL OTHER ERROR: $e');
-      debugPrint('LOCAL OTHER STACK: $st');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Other error: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isSubmitting = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('حدث خطأ غير متوقع أثناء تحديث الملف'),
+      ),
+    );
+  } finally {
+    if (mounted) {
+      setState(() => _isSubmitting = false);
     }
   }
-
+}
+@override
+void dispose() {
+  _heightController.dispose();
+  _weightController.dispose();
+  _allergyInputController.dispose();
+  _chronicInputController.dispose();
+  super.dispose();
+}
   @override
-  Widget build(BuildContext context) {
+Widget build(BuildContext context) {
     final localizations = AppLocalizations.of(context);
 
     return Scaffold(
@@ -244,19 +353,19 @@ if (isGuardian &&
     icon: const Icon(Icons.arrow_back),
     tooltip: 'رجوع',
     onPressed: () {
-      if (context.canPop()) {
-        context.pop();
-        return;
-      }
+  final isGuardian = ref.read(authProvider).isGuardian;
 
-      final authState = ref.read(authProvider);
+  if (isGuardian && context.canPop()) {
+    context.pop(false);
+    return;
+  }
 
-      if (authState.isGuardian) {
-        context.goNamed('guardianHome');
-      } else {
-        context.goNamed('patientHome');
-      }
-    },
+  if (isGuardian) {
+    context.goNamed('guardianHome');
+  } else {
+    context.goNamed('patientHome');
+  }
+},
   ),
 ),
       body: SingleChildScrollView(
@@ -364,11 +473,28 @@ if (isGuardian &&
               const SizedBox(height: 8),
               TextFormField(
                 controller: _heightController,
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'مثال: 170',
+                  prefixText: 'cm',
+                
                 ),
+                validator: (value) {
+  final input = value?.trim().replaceAll(',', '.') ?? '';
+
+  if (input.isEmpty) {
+    return null;
+  }
+
+  final height = double.tryParse(input);
+
+  if (height == null || height < 30 || height > 300) {
+    return 'أدخل طولًا صحيحًا بين 30 و300 سم';
+  }
+
+  return null;
+},
               ),
               const SizedBox(height: 16),
 
@@ -377,11 +503,26 @@ if (isGuardian &&
               const SizedBox(height: 8),
               TextFormField(
                 controller: _weightController,
-                keyboardType: TextInputType.number,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                   hintText: 'مثال: 65',
                 ),
+                validator: (value) {
+  final input = value?.trim().replaceAll(',', '.') ?? '';
+
+  if (input.isEmpty) {
+    return null;
+  }
+
+  final weight = double.tryParse(input);
+
+  if (weight == null || weight < 1 || weight > 700) {
+    return 'أدخل وزنًا صحيحًا بين 1 و700 كغ';
+  }
+
+  return null;
+},
               ),
               const SizedBox(height: 16),
 

@@ -3,7 +3,8 @@
 declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
-
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 use App\Domain\Actions\Auth\LoginAction;
 use App\Domain\Actions\Auth\RegisterGuardianAction;
 use App\Domain\Actions\Auth\RegisterPatientAction;
@@ -122,4 +123,47 @@ public function login(LoginRequest $request): JsonResponse
             'data' => new UserResource($user),
         ]);
     }
+public function updateProfile(Request $request): JsonResponse
+{
+    /** @var User $user */
+    $user = $request->user();
+
+    $data = $request->validate([
+        'name' => ['required', 'string', 'max:255'],
+        'phone' => ['required', 'string', 'max:30'],
+        'email' => ['nullable', 'email', 'max:255'],
+    ]);
+
+    $user->update($data);
+
+    return response()->json([
+        'data' => new UserResource($user->fresh()),
+    ]);
+}
+public function updatePassword(Request $request): JsonResponse
+{
+    /** @var User $user */
+    $user = $request->user();
+
+    $data = $request->validate([
+        'current_password' => ['required', 'string'],
+        'password' => ['required', 'string', 'min:8', 'confirmed'],
+    ]);
+
+    if (! Hash::check($data['current_password'], $user->password)) {
+        throw ValidationException::withMessages([
+            'current_password' => ['كلمة المرور الحالية غير صحيحة.'],
+        ]);
+    }
+
+    $user->update([
+        'password' => Hash::make($data['password']),
+    ]);
+
+    $user->tokens()->delete();
+
+    return response()->json([
+        'message' => 'تم تغيير كلمة المرور. يرجى تسجيل الدخول مرة أخرى.',
+    ]);
+}
 }

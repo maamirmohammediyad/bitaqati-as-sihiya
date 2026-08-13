@@ -46,11 +46,21 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
 
     // Emergency
-     Route::get('/emergency/guardians', [EmergencyController::class, 'guardians']);
-    Route::post('emergency/sos', [EmergencyController::class, 'trigger']);
-    Route::get('emergency/history', [EmergencyController::class, 'history']);
-    Route::post('emergency/{id}/resolve', [EmergencyController::class, 'resolve']);
-    Route::get('emergency/{id}', [EmergencyController::class, 'show']);
+Route::get('emergency/current', [EmergencyController::class, 'current']);
+Route::post('emergency/sos', [EmergencyController::class, 'trigger']);
+Route::delete('emergency/{id}/cancel', [EmergencyController::class, 'cancel']);
+Route::get('emergency/history', [EmergencyController::class, 'history']);
+Route::get('emergency/{id}', [EmergencyController::class, 'show']);
+Route::get('emergency/guardians', [EmergencyController::class, 'guardians']);
+Route::middleware([
+    'auth:sanctum',
+    'role:hospital_admin,hospital_staff',
+])->group(function (): void {
+    Route::post(
+        'emergency/{id}/check-in',
+        [EmergencyController::class, 'checkIn'],
+    );
+});
     Route::post('/emergency/trigger', [EmergencyController::class, 'trigger']);
     // Patient QR
     Route::middleware('auth:sanctum')->group(function (): void {
@@ -86,9 +96,20 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('guardian/patient/{id}/medical-files', [PatientController::class, 'patientMedicalFiles']);
     Route::post('guardian/patient/{id}/medical-files', [PatientController::class, 'uploadMedicalFile']);
     Route::get('guardian/patient/{id}/emergencies', [PatientController::class, 'guardianPatientEmergencies']);
+    Route::get('guardian/patient/{patientId}/emergencies/{eventId}',[PatientController::class, 'guardianPatientEmergencyDetail']);
+
+    Route::post('guardian/patient/{patientId}/emergencies/{eventId}/read',[PatientController::class, 'markGuardianEmergencyAsRead']);
 });
 
-
+Route::middleware('auth:sanctum')->group(function (): void {
+    Route::post('guardian/patient/{id}/qr-token', [PatientQrController::class, 'issueForGuardian']);
+    Route::put('auth/profile', [AuthController::class, 'updateProfile']);
+    Route::put('auth/password', [AuthController::class, 'updatePassword']);
+    Route::post(
+    'guardian/patient/{id}/qr-token',
+    [PatientQrController::class, 'issueForGuardian'],
+);
+});
     // Admin
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('admin/users', [AdminController::class, 'users'])->name('admin.users');

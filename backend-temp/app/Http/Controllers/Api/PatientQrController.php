@@ -155,4 +155,38 @@ class PatientQrController extends Controller
         ],
     ]);
 }
+public function issueForGuardian(Request $request, string $id): JsonResponse
+{
+    /** @var User $guardian */
+    $guardian = $request->user();
+
+    $patient = $guardian->patients()
+        ->where('users.id', $id)
+        ->first();
+
+    if (! $patient) {
+        return response()->json([
+            'message' => 'هذا المريض غير مرتبط بحسابك.',
+        ], 403);
+    }
+
+    PatientQrToken::where('user_id', $patient->id)
+        ->where('expires_at', '<', now())
+        ->delete();
+
+    $plainToken = Str::random(40);
+
+    $qr = PatientQrToken::create([
+        'user_id' => $patient->id,
+        'token' => hash('sha256', $plainToken),
+        'expires_at' => now()->addDay(),
+    ]);
+
+    return response()->json([
+        'data' => [
+            'token' => $plainToken,
+            'expires_at' => $qr->expires_at->toIso8601String(),
+        ],
+    ]);
+}
 }

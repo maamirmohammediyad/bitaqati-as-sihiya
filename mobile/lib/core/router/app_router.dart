@@ -15,12 +15,16 @@ import 'package:bitaqati_as_sihiya/features/hospitals/presentation/screens/hospi
 import 'package:bitaqati_as_sihiya/features/settings/presentation/screens/settings_screen.dart';
 import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/complete_profile_screen.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_dashboard.dart';
+import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_patient_card_screen.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/patient_details_screen.dart'; 
 import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/patient_qr_screen.dart';
 import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/patient_files_screen.dart';    
 import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/medical_record_screen.dart'; 
 import 'package:bitaqati_as_sihiya/features/emergency/presentation/screens/emergency_history_screen.dart';  
-import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_patient_emergencies_screen.dart';                                                                     
+import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_patient_emergencies_screen.dart';
+import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_account_screen.dart';   
+import 'package:bitaqati_as_sihiya/features/guardian/presentation/screens/guardian_patient_medical_files_screen.dart';  
+import 'package:bitaqati_as_sihiya/features/patient/presentation/screens/patient_account_screen.dart';                                        
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authProvider);
 
@@ -71,6 +75,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const HealthCardScreen(),
           ),
           GoRoute(
+  path: '/patient/account',
+  name: 'patientAccount',
+  builder: (context, state) => const PatientAccountScreen(),
+),
+          GoRoute(
   path: '/patient/medical-record',
   name: 'patientMedicalRecord',
   builder: (context, state) => const MedicalRecordScreen(),
@@ -110,21 +119,15 @@ GoRoute(
   builder: (context, state) => const GuardianDashboard(),
 ),
           GoRoute(
-            path: '/guardian/patient-card',
-            name: 'guardianPatientCard',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Patient Card')),
-            ),
-          ),
-          GoRoute(
-  path: '/guardian/patient-details',
-  name: 'guardianPatientDetails',
-  builder: (context, state) {
-    final patient = state.extra as User;
-    return PatientDetailsScreen(patient: patient);
-  },
+  path: '/guardian/card',
+  name: 'guardianPatientCard',
+  builder: (context, state) => const GuardianPatientCardScreen(),
 ),
-
+GoRoute(
+  path: '/guardian/account',
+  name: 'guardianAccount',
+  builder: (context, state) => const GuardianAccountScreen(),
+),
           GoRoute(
             path: '/guardian/medical-record',
             name: 'guardianMedicalRecord',
@@ -161,10 +164,14 @@ GoRoute(
             ),
           ),
           GoRoute(
-            path: '/guardian/patient-complete-profile',
-            name: 'guardianPatientCompleteProfile',
-            builder: (context, state) => const CompleteProfileScreen(),
-          ),
+  path: '/guardian/patient/:patientId/complete-profile',
+  name: 'guardianPatientCompleteProfile',
+  builder: (context, state) {
+    return CompleteProfileScreen(
+      patientId: state.pathParameters['patientId'],
+    );
+  },
+),
         ],
       ),
       GoRoute(
@@ -179,16 +186,19 @@ GoRoute(
     );
   },
 ),
-        GoRoute(
+       GoRoute(
   path: '/guardian/patient/:id/medical-files',
   name: 'guardianPatientMedicalFiles',
   builder: (context, state) {
-    // نستقبل الـ patient المرسل من الـ Dashboard
-    final patient = state.extra as User;
-    return PatientDetailsScreen(patient: patient);
+    final patient = state.extra as User?;
+    final patientId = state.pathParameters['id']!;
+
+    return GuardianPatientMedicalFilesScreen(
+      patientId: patientId,
+      patientName: patient?.fullName ?? patient?.fullName ?? 'المريض',
+    );
   },
 ),
-
     GoRoute(
       path: '/guardian/patient/:id/qr',
       name: 'guardianPatientQr',
@@ -218,37 +228,38 @@ GoRoute(
 
 class _PatientShell extends StatelessWidget {
   final Widget child;
-  const _PatientShell({required this.child});
+
+  const _PatientShell({
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: child,
-      bottomNavigationBar: _PatientBottomNav(),
+      bottomNavigationBar: const _PatientBottomNav(),
     );
   }
 }
 
-class _PatientBottomNav extends ConsumerWidget {
+class _PatientBottomNav extends StatelessWidget {
+  const _PatientBottomNav();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final localizations = AppLocalizations.of(context);
 
     int currentIndex = 0;
+
     if (location.startsWith('/patient/health-card')) {
       currentIndex = 1;
-    } else if (location.startsWith('/patient/medical-record')) {
+    } else if (location.startsWith('/patient/account')) {
       currentIndex = 2;
-    } else if (location.startsWith('/patient/files')) {
-      currentIndex = 3;
-    } else if (location.startsWith('/patient/hospitals')) {
-      currentIndex = 4;
     }
 
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: (index) {
+    return NavigationBar(
+      selectedIndex: currentIndex,
+      onDestinationSelected: (index) {
         switch (index) {
           case 0:
             context.go('/patient/home');
@@ -257,41 +268,25 @@ class _PatientBottomNav extends ConsumerWidget {
             context.go('/patient/health-card');
             break;
           case 2:
-            context.go('/patient/medical-record');
-            break;
-          case 3:
-            context.go('/patient/files');
-            break;
-          case 4:
-            context.go('/patient/hospitals');
+            context.go('/patient/account');
             break;
         }
       },
-      items: [
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.home_outlined),
-          activeIcon: const Icon(Icons.home),
-          label: localizations.home,
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home_rounded),
+          label: 'الرئيسية',
         ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.credit_card_outlined),
-          activeIcon: const Icon(Icons.credit_card),
-          label: localizations.healthCard,
+        NavigationDestination(
+          icon: Icon(Icons.badge_outlined),
+          selectedIcon: Icon(Icons.badge_rounded),
+          label: 'بطاقتي',
         ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.folder_outlined),
-          activeIcon: const Icon(Icons.folder),
-          label: localizations.medicalRecord,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.upload_file_outlined),
-          activeIcon: const Icon(Icons.upload_file),
-          label: localizations.files,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.local_hospital_outlined),
-          activeIcon: const Icon(Icons.local_hospital),
-          label: localizations.hospitals,
+        NavigationDestination(
+          icon: Icon(Icons.person_outline_rounded),
+          selectedIcon: Icon(Icons.person_rounded),
+          label: 'حسابي',
         ),
       ],
     );
@@ -300,100 +295,63 @@ class _PatientBottomNav extends ConsumerWidget {
 
 class _GuardianShell extends StatelessWidget {
   final Widget child;
+
   const _GuardianShell({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: child,
-      bottomNavigationBar: _GuardianBottomNav(),
+      bottomNavigationBar: const _GuardianBottomNav(),
     );
   }
 }
 
-class _GuardianBottomNav extends ConsumerWidget {
+class _GuardianBottomNav extends StatelessWidget {
+  const _GuardianBottomNav();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final localizations = AppLocalizations.of(context);
 
     int currentIndex = 0;
-    if (location.startsWith('/guardian/patient-card')) {
+
+    if (location.startsWith('/guardian/card')) {
       currentIndex = 1;
-    } else if (location.startsWith('/guardian/medical-record')) {
+    } else if (location.startsWith('/guardian/account')) {
       currentIndex = 2;
-    } else if (location.startsWith('/guardian/files')) {
-      currentIndex = 3;
-    } else if (location.startsWith('/guardian/location')) {
-      currentIndex = 4;
-    } else if (location.startsWith('/guardian/notifications')) {
-      currentIndex = 5;
-    } else if (location.startsWith('/guardian/emergency-history')) {
-      currentIndex = 6;
     }
 
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: (index) {
+    return NavigationBar(
+      selectedIndex: currentIndex,
+      onDestinationSelected: (index) {
         switch (index) {
           case 0:
             context.go('/guardian/home');
             break;
           case 1:
-            context.go('/guardian/patient-card');
+            context.go('/guardian/card');
             break;
           case 2:
-            context.go('/guardian/medical-record');
-            break;
-          case 3:
-            context.go('/guardian/files');
-            break;
-          case 4:
-            context.go('/guardian/location');
-            break;
-          case 5:
-            context.go('/guardian/notifications');
-            break;
-          case 6:
-            context.go('/guardian/emergency-history');
+            context.go('/guardian/account');
             break;
         }
       },
-      items: [
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.home_outlined),
-          activeIcon: const Icon(Icons.home),
-          label: localizations.home,
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home_rounded),
+          label: 'الرئيسية',
         ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.credit_card_outlined),
-          activeIcon: const Icon(Icons.credit_card),
-          label: localizations.healthCard,
+        NavigationDestination(
+          icon: Icon(Icons.badge_outlined),
+          selectedIcon: Icon(Icons.badge_rounded),
+          label: 'بطاقتي',
         ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.folder_outlined),
-          activeIcon: const Icon(Icons.folder),
-          label: localizations.medicalRecord,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.upload_file_outlined),
-          activeIcon: const Icon(Icons.upload_file),
-          label: localizations.files,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.location_on_outlined),
-          activeIcon: const Icon(Icons.location_on),
-          label: localizations.navigate,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.notifications_outlined),
-          activeIcon: const Icon(Icons.notifications),
-          label: localizations.notifications,
-        ),
-        BottomNavigationBarItem(
-          icon: const Icon(Icons.history_outlined),
-          activeIcon: const Icon(Icons.history),
-          label: localizations.emergencyHistory,
+        NavigationDestination(
+          icon: Icon(Icons.person_outline_rounded),
+          selectedIcon: Icon(Icons.person_rounded),
+          label: 'حسابي',
         ),
       ],
     );

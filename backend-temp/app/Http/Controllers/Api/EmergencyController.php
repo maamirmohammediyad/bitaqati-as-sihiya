@@ -49,7 +49,67 @@ class EmergencyController extends Controller
             'data' => new EmergencyEventResource($event->fresh()),
         ]);
     }
+public function current(Request $request): JsonResponse
+{
+    $event = EmergencyEvent::query()
+        ->with([
+            'checkedInHospital',
+            'user.patientProfile',
+            'user.medicalFiles',
+            'user.guardians',
+        ])
+        ->where('user_id', $request->user()->id)
+        ->whereIn('status', ['active', 'checked_in'])
+        ->latest('created_at')
+        ->first();
 
+    return response()->json([
+        'data' => $event
+            ? new EmergencyEventResource($event)
+            : null,
+    ]);
+}
+public function cancel(string $id, Request $request): JsonResponse
+{
+    $event = EmergencyEvent::query()
+        ->where('id', $id)
+        ->where('user_id', $request->user()->id)
+        ->where('status', 'active')
+        ->firstOrFail();
+
+    $event->delete();
+
+    return response()->json([
+        'message' => 'تم إلغاء نداء الطوارئ وحذفه.',
+    ]);
+}
+public function checkIn(string $id, Request $request): JsonResponse
+{
+    $staff = $request->user();
+
+    $hospital = $staff->hospitals()
+        ->wherePivot('is_active', true)
+        ->first();
+
+    abort_unless($hospital !== null, 403, 'هذا الحساب غير مرتبط بمستشفى نشط.');
+
+    $event = EmergencyEvent::query()
+        ->where('id', $id)
+        ->where('status', 'active')
+        ->firstOrFail();
+
+    $event->update([
+        'status' => 'checked_in',
+        'checked_in_hospital_id' => $hospital->id,
+        'checked_in_at' => now(),
+    ]);
+
+    return response()->json([
+        'data' => new EmergencyEventResource(
+            $event->fresh()->load('checkedInHospital'),
+        ),
+    ]);
+}
     public function history(Request $request): JsonResponse
     {
         $events = EmergencyEvent::where('user_id', $request->user()->id)
@@ -101,51 +161,4 @@ public function guardians(Request $request): JsonResponse
         'data' => $guardians,
     ]);
 }
- public function sos(Request $request, FCMService $fcm, AuditLogService $audit)
-    {
-        /** @var \App\Models\User $patient */
-        $patient = $request->user();
-
-        // 1) إنشاء حدث الطوارئ
-        $event = EmergencyEvent::create([
-            'patient_id'   => $patient->id,
-            'status'       => 'active',
-            'triggered_at' => now(),
-            // أضف هنا location أو ملاحظات إن وجدت
-        ]);
-
-        // 2) تسجيله في سجل التدقيق
-        $audit->log('emergency_sos_triggered', [
-            'patient_id'   => $patient->id,
-            'emergency_id' => $event->id,
-        ]);
-
-        // 3) جمع توكنات أولياء المريض
-        $guardianTokens = $patient->guardians
-            ->pluck('fcm_token')
-            ->filter()          // إزالة null / فراغ
-            ->values()
-            ->all();
-
-        if (! empty($guardianTokens)) {
-            $title = 'نداء طوارئ من مريضك';
-            $body  = 'المريض ' . ($patient->name ?? 'المرتبط بحسابك') . ' قام بتفعيل زر الطوارئ.';
-
-            $data = [
-                'type'         => 'sos',
-                'patient_id'   => (string) $patient->id,
-                'emergency_id' => (string) $event->id,
-            ];
-
-            // استخدام FCMService الذي عندك
-            $fcm->sendToMultipleDevices($guardianTokens, $data, $title, $body);
-        }
-
-        return response()->json([
-            'status' => 'ok',
-            'data'   => [
-                'event_id' => $event->id,
-            ],
-        ]);
-    }
 }

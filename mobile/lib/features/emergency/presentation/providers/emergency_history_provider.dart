@@ -30,17 +30,23 @@ class GuardianInfo {
 class EmergencyEventItem {
   final String id;
   final String status;
+  final bool isRead;
   final DateTime createdAt;
   final DateTime? resolvedAt;
   final String? locationName;
+  final double? latitude;
+  final double? longitude;
   final List<GuardianInfo> guardians;
 
   EmergencyEventItem({
     required this.id,
     required this.status,
+    required this.isRead,
     required this.createdAt,
     this.resolvedAt,
     this.locationName,
+    this.latitude,
+    this.longitude,
     this.guardians = const [],
   });
 
@@ -50,11 +56,14 @@ class EmergencyEventItem {
     return EmergencyEventItem(
       id: json['id'].toString(),
       status: json['status'] as String? ?? 'active',
+      isRead: json['is_read'] == true,
       createdAt: DateTime.parse(json['created_at'] as String),
       resolvedAt: json['resolved_at'] != null
-          ? DateTime.parse(json['resolved_at'] as String)
+          ? DateTime.tryParse(json['resolved_at'] as String)
           : null,
       locationName: json['location_name'] as String?,
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
       guardians: guardiansJson
           .whereType<Map<String, dynamic>>()
           .map(GuardianInfo.fromJson)
@@ -69,10 +78,18 @@ final emergencyHistoryProvider =
 
   final response = await apiClient.get(ApiConstants.emergencyHistory);
   // Laravel يرجع: { data: [...], meta: {...} }
-  final data = response.data['data'] as List<dynamic>? ?? [];
+final rawData = response.data['data'];
+
+final data = rawData is List
+    ? rawData
+    : const <dynamic>[];
 
   return data
-      .whereType<Map<String, dynamic>>()
-      .map(EmergencyEventItem.fromJson)
-      .toList();
+    .whereType<Map>()
+    .map(
+      (item) => EmergencyEventItem.fromJson(
+        Map<String, dynamic>.from(item),
+      ),
+    )
+    .toList();
 });

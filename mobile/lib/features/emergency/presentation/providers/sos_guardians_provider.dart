@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:bitaqati_as_sihiya/core/network/api_client.dart';
 import 'package:bitaqati_as_sihiya/core/constants/api_constants.dart';
-
+import 'package:bitaqati_as_sihiya/features/emergency/presentation/providers/emergency_history_provider.dart';
 class SosGuardian {
   final String id;
   final String name;
@@ -30,12 +30,19 @@ final sosGuardiansProvider =
   final apiClient = ref.watch(apiClientProvider);
 
   final response = await apiClient.get(ApiConstants.emergencyGuardians);
-  print('GUARDIANS RESPONSE: ${response.data}');
 
-  final data = response.data['data'] as List<dynamic>? ?? [];
+  final rawData = response.data['data'];
 
-  return data
-      .whereType<Map<String, dynamic>>()
-      .map(SosGuardian.fromJson)
-      .toList();
+final data = rawData is List
+    ? rawData
+    : const <dynamic>[];
+
+ return data
+    .whereType<Map>()
+    .map(
+      (item) => SosGuardian.fromJson(
+        Map<String, dynamic>.from(item),
+      ),
+    )
+    .toList();
 });

@@ -14,10 +14,67 @@ final guardianPatientEmergenciesProvider =
     ApiConstants.guardianPatientEmergencies(patientId),
   );
 
-  final data = response.data['data'] as List<dynamic>? ?? [];
+  final rawData = response.data['data'];
+
+final data = rawData is List
+    ? rawData
+    : const <dynamic>[];
 
   return data
-      .whereType<Map<String, dynamic>>()
-      .map(EmergencyEventItem.fromJson)
-      .toList();
+    .whereType<Map>()
+    .map(
+      (item) => EmergencyEventItem.fromJson(
+        Map<String, dynamic>.from(item),
+      ),
+    )
+    .toList();
 });
+final guardianEmergencyDetailProvider =
+    FutureProvider.family<EmergencyEventItem, GuardianEmergencyParams>(
+  (ref, params) async {
+    final apiClient = ref.watch(apiClientProvider);
+
+    final response = await apiClient.get(
+      ApiConstants.guardianPatientEmergencyDetail(
+        params.patientId,
+        params.eventId,
+      ),
+    );
+
+    final data = Map<String, dynamic>.from(
+      response.data['data'] as Map,
+    );
+
+    return EmergencyEventItem.fromJson(data);
+  },
+);
+
+class GuardianEmergencyParams {
+  final String patientId;
+  final String eventId;
+
+  const GuardianEmergencyParams({
+    required this.patientId,
+    required this.eventId,
+  });
+}
+Future<void> markGuardianEmergencyAsRead({
+  required WidgetRef ref,
+  required String patientId,
+  required String eventId,
+}) async {
+  final apiClient = ref.read(apiClientProvider);
+
+  await apiClient.post(
+    ApiConstants.guardianPatientEmergencyRead(patientId, eventId),
+  );
+
+  ref.invalidate(guardianPatientEmergenciesProvider(patientId));
+}
+
+void refreshGuardianPatientEmergencies(
+  WidgetRef ref,
+  String patientId,
+) {
+  ref.invalidate(guardianPatientEmergenciesProvider(patientId));
+}

@@ -12,36 +12,45 @@ use Illuminate\Support\Facades\DB;
 
 class HospitalController extends Controller
 {
-    public function nearby(Request $request): JsonResponse
-    {
-        $lat = (float) $request->query('lat');
-        $lng = (float) $request->query('lng');
-        $radiusKm = (float) $request->query('radius', 10); // 10 كم مثلاً
+public function nearby(Request $request): JsonResponse
+{
+    $validated = $request->validate([
+        'lat' => ['required', 'numeric', 'between:-90,90'],
+        'lng' => ['required', 'numeric', 'between:-180,180'],
+        'radius' => ['nullable', 'numeric', 'min:1', 'max:100'],
+    ]);
 
-        if (!$lat || !$lng) {
-            return response()->json([
-                'message' => 'lat and lng are required',
-            ], 422);
-        }
+    $lat = (float) $validated['lat'];
+    $lng = (float) $validated['lng'];
+    $radiusKm = (float) ($validated['radius'] ?? 10);
 
-        // Haversine formula
-        $hospitals = DB::table('hospitals')
-            ->where('is_active', true)
-            ->select('*')
-            ->selectRaw("
-                (6371 * acos(
-                    cos(radians(?)) * cos(radians(latitude))
-                    * cos(radians(longitude) - radians(?))
-                    + sin(radians(?)) * sin(radians(latitude))
-                )) AS distance
-            ", [$lat, $lng, $lat])
-            ->having('distance', '<=', $radiusKm)
-            ->orderBy('distance')
-            ->get();
+    $distanceSql = '
+        6371 * acos(
+            cos(radians(?)) * cos(radians(latitude))
+            * cos(radians(longitude) - radians(?))
+            + sin(radians(?)) * sin(radians(latitude))
+        )
+    ';
 
-        return response()->json([
-            'data'  => $hospitals,
-            'count' => $hospitals->count(),
-        ]);
-    }
+    $hospitals = DB::table('hospitals')
+        ->where('is_active', true)
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->select('*')
+        ->selectRaw(
+            "($distanceSql) AS distance",
+            [$lat, $lng, $lat],
+        )
+        ->whereRaw(
+            "($distanceSql) <= ?",
+            [$lat, $lng, $lat, $radiusKm],
+        )
+        ->orderBy('distance')
+        ->get();
+
+    return response()->json([
+        'data' => $hospitals,
+        'count' => $hospitals->count(),
+    ]);
+}
 }

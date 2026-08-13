@@ -15,7 +15,7 @@ use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use App\Domain\Models\MedicalFile;
-// تأكد من استيراد هذه الموارد/الموديلات إن لم تكن مستوردة مسبقاً
+use App\Domain\Models\EmergencyEventRead;
 use App\Http\Resources\MedicalFileResource;
 use App\Http\Resources\EmergencyEventResource;
 use App\Domain\Models\EmergencyEvent;
@@ -49,8 +49,10 @@ public function completeProfile(CompleteProfileRequest $request): JsonResponse
         $targetUserId = $authUser->id;
     }
 
-    $data = $request->validated();
-    unset($data['patient_id']);
+    $data = collect($request->validated())
+    ->except('patient_id')
+    ->filter(fn ($value) => $value !== null && $value !== '')
+    ->all();
 
     $profile = $this->completeProfileAction->execute(
         $targetUserId,
@@ -185,14 +187,16 @@ public function myEmergencies(Request $request)
                 'patient' => new UserResource($patient),
 
                 'profile' => $profile ? [
-                    'full_name'           => $profile->full_name,
-                    'date_of_birth'       => optional($profile->date_of_birth)?->toDateString(),
-                    'blood_group'         => $profile->blood_group?->value,
-                    'gender'              => $profile->gender,
-                    'height_cm'           => $profile->height_cm,
-                    'weight_kg'           => $profile->weight_kg,
-                    'is_profile_complete' => (bool) $profile->is_profile_complete,
-                ] : null,
+    'full_name' => $profile->full_name,
+    'date_of_birth' => optional($profile->date_of_birth)?->toDateString(),
+    'blood_group' => $profile->blood_group?->value,
+    'gender' => $profile->gender,
+    'height_cm' => $profile->height_cm,
+    'weight_kg' => $profile->weight_kg,
+    'allergies' => $profile->allergies,
+    'chronic_diseases' => $profile->chronic_diseases,
+    'is_profile_complete' => (bool) $profile->is_profile_complete,
+] : null,
 
                 'emergency' => [
                     'count'      => $emergencyCount,
@@ -238,22 +242,23 @@ public function myEmergencies(Request $request)
         ]);
     }
 
-public function guardianPatientEmergencies(string $id, Request $request): JsonResponse
-{
+public function guardianPatientEmergencies(
+    string $id,
+    Request $request,
+): JsonResponse {
+    /** @var User $guardian */
     $guardian = $request->user();
 
-    // تأكد أن هذا المريض مرتبط بهذا الولي (لكن بدون استخدام Middleware الدور)
-    $isLinked = $guardian->patients()
-        ->where('patient_id', $id)
-        ->exists();
+    $patient = $guardian->patients()
+        ->where('users.id', $id)
+        ->firstOrFail();
 
-    if (! $isLinked) {
-        return response()->json([
-            'message' => 'You are not authorized to view this patient emergencies.',
-        ], 403);
-    }
-
-    $events = EmergencyEvent::where('user_id', $id)
+    $events = EmergencyEvent::query()
+        ->where('user_id', $patient->id)
+        ->withExists([
+            'reads as is_read' => fn ($query) => $query
+                ->where('guardian_id', $guardian->id),
+        ])
         ->orderByDesc('created_at')
         ->get();
 
@@ -298,5 +303,65 @@ public function uploadMedicalFile(Request $request, string $id): JsonResponse
     return response()->json([
         'data' => new MedicalFileResource($medicalFile),
     ], 201);
+}
+public function guardianPatientEmergencyDetail(
+    string $patientId,
+    string $eventId,
+    Request $request,
+): JsonResponse {
+    /** @var User $guardian */
+    $guardian = $request->user();
+
+    $patient = $guardian->patients()
+        ->where('users.id', $patientId)
+        ->firstOrFail();
+
+    $event = EmergencyEvent::query()
+        ->where('id', $eventId)
+        ->where('user_id', $patient->id)
+        ->withExists([
+            'reads as is_read' => fn ($query) => $query
+                ->where('guardian_id', $guardian->id),
+        ])
+        ->firstOrFail();
+
+    return response()->json([
+        'data' => new EmergencyEventResource($event),
+    ]);
+}
+public function markGuardianEmergencyAsRead(
+    string $patientId,
+    string $eventId,
+    Request $request,
+): JsonResponse {
+    /** @var User $guardian */
+    $guardian = $request->user();
+
+    $patient = $guardian->patients()
+        ->where('users.id', $patientId)
+        ->firstOrFail();
+
+    $event = EmergencyEvent::query()
+        ->where('id', $eventId)
+        ->where('user_id', $patient->id)
+        ->firstOrFail();
+
+    $read = EmergencyEventRead::firstOrCreate(
+        [
+            'emergency_event_id' => $event->id,
+            'guardian_id' => $guardian->id,
+        ],
+        [
+            'read_at' => now(),
+        ],
+    );
+
+    return response()->json([
+        'data' => [
+            'event_id' => $event->id,
+            'is_read' => true,
+            'read_at' => $read->read_at?->toIso8601String(),
+        ],
+    ]);
 }
 }

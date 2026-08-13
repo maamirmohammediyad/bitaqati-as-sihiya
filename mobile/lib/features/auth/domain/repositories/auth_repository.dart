@@ -30,4 +30,16 @@ abstract class AuthRepository {
   Future<Either<Failure, void>> logout();
 
   Future<Either<Failure, User>> getCurrentUser();
+
+  Future<Either<Failure, User>> updateGuardianProfile({
+  required String name,
+  required String phone,
+  String? email,
+});
+
+Future<Either<Failure, void>> updatePassword({
+  required String currentPassword,
+  required String password,
+  required String passwordConfirmation,
+});
 }

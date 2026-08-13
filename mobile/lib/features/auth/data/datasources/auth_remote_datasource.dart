@@ -90,4 +90,35 @@ class AuthRemoteDataSource {
       rethrow;
     }
   }
+ Future<Map<String, dynamic>> updateGuardianProfile({
+  required String name,
+  required String phone,
+  String? email,
+}) async {
+  final response = await _apiClient.put(
+    ApiConstants.updateGuardianProfile,
+    data: {
+      'name': name,
+      'phone': phone,
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+    },
+  );
+
+  return response.data as Map<String, dynamic>;
+}
+Future<void> updatePassword({
+  required String currentPassword,
+  required String password,
+  required String passwordConfirmation,
+}) async {
+  await _apiClient.put(
+    ApiConstants.updatePassword,
+    data: {
+      'current_password': currentPassword,
+      'password': password,
+      'password_confirmation': passwordConfirmation,
+    },
+  );
+}
+
 }

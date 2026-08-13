@@ -1,166 +1,304 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:bitaqati_as_sihiya/core/localization/app_localizations.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
-import 'package:bitaqati_as_sihiya/features/patient/presentation/widgets/health_card.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
+import 'package:bitaqati_as_sihiya/features/patient/presentation/providers/patient_qr_provider.dart';
+import 'package:bitaqati_as_sihiya/features/patient/presentation/widgets/health_card.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
-class HealthCardScreen extends ConsumerWidget {
+import 'package:bitaqati_as_sihiya/features/auth/domain/entities/user.dart';
+class HealthCardScreen extends ConsumerStatefulWidget {
   const HealthCardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final localizations = AppLocalizations.of(context);
-    final authState = ref.watch(authProvider);
-    final user = authState.user;
+  ConsumerState<HealthCardScreen> createState() => _HealthCardScreenState();
+}
+
+class _HealthCardScreenState extends ConsumerState<HealthCardScreen> {
+  bool _showNationalId = false;
+
+  String _maskNationalId(String nationalId) {
+    if (nationalId.isEmpty) return 'غير متوفر';
+
+    if (nationalId.length <= 4) {
+      return '*' * nationalId.length;
+    }
+
+    final lastFour = nationalId.substring(nationalId.length - 4);
+    return '********$lastFour';
+  }
+
+  void _toggleNationalId() {
+    setState(() {
+      _showNationalId = !_showNationalId;
+    });
+  }
+
+  Future<void> _refreshQr() async {
+    ref.invalidate(patientQrTokenProvider);
+    await ref.read(patientQrTokenProvider.future);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = ref.watch(authProvider).user;
+    final qrTokenAsync = ref.watch(patientQrTokenProvider);
 
     if (user == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(localizations.myHealthCard),
-        ),
-        body: const Center(
+      return const Scaffold(
+        body: Center(
           child: Text('لا يوجد مريض مسجّل حالياً'),
         ),
       );
     }
 
+    final nationalId = user.nationalId.trim();
+
+    final displayedNationalId = _showNationalId
+        ? (nationalId.isEmpty ? 'غير متوفر' : nationalId)
+        : _maskNationalId(nationalId);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(localizations.myHealthCard),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share_outlined),
-            onPressed: () {},
-          ),
-        ],
+        title: const Text('صحتك تيك'),
+        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: RefreshIndicator(
+        onRefresh: _refreshQr,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            // البطاقة الصحية نفسها
-            HealthCardWidget(
-  patientName: user.fullName,
-  nationalId: user.nationalId,
-  bloodType: user.bloodType ?? 'N/A',
-  allergies: 'None',
-  chronicDiseases: null,
-  cardNumber: user.patientCode ?? 'N/A',
-  validUntil: '12/2028',
-            ),
-            const SizedBox(height: 24),
-
-            // قسم QR
             Text(
-              localizations.qrCode,
+              'بطاقتك الصحية الرقمية',
               style: AppTextStyles.heading3,
             ),
             const SizedBox(height: 4),
             Text(
-              localizations.scanQr,
-              style: AppTextStyles.bodyMedium,
+              'اعرض رمز QR والبيانات الصحية الأساسية بطريقة آمنة.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: AppColors.grey700,
+              ),
             ),
             const SizedBox(height: 16),
-            Center(
-  child: GestureDetector(
-    onTap: () {
-      // افتح شاشة الكود الصحي
-      context.go('/patient/qr');
-    },
-    child: Container(
-      width: 180,
-      height: 180,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.grey200),
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.qr_code_2_rounded,
-          size: 140,
-          color: AppColors.grey900,
-        ),
-      ),
-    ),
-  ),
-),
+
+            qrTokenAsync.when(
+              loading: () => _buildHealthCard(
+                user: user,
+                displayedNationalId: displayedNationalId,
+              ),
+              error: (_, __) => Column(
+                children: [
+                  _buildHealthCard(
+                    user: user,
+                    displayedNationalId: displayedNationalId,
+                  ),
+                  const SizedBox(height: 12),
+                  _QrUnavailableBanner(
+                    onRetry: _refreshQr,
+                  ),
+                ],
+              ),
+              data: (qrToken) => _buildHealthCard(
+                user: user,
+                displayedNationalId: displayedNationalId,
+                qrData: qrToken.token,
+              ),
+            ),
+
             const SizedBox(height: 24),
 
-            // تفاصيل البطاقة
             Text(
-              localizations.cardNumber,
-              style: AppTextStyles.heading4,
+              'ملخص البطاقة',
+              style: AppTextStyles.heading3,
             ),
             const SizedBox(height: 12),
-            _DetailRow(
-              label: user.patientCode ?? 'BQS-2024-00001',
-              icon: Icons.tag_outlined,
+
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  _CardInfoTile(
+                    icon: Icons.badge_outlined,
+                    title: 'كود المريض',
+                    value: user.patientCode ?? 'غير متوفر',
+                  ),
+                  const Divider(height: 1),
+                  _CardInfoTile(
+                    icon: Icons.bloodtype_outlined,
+                    title: 'فصيلة الدم',
+                    value: user.bloodType ?? 'غير محددة',
+                  ),
+                  const Divider(height: 1),
+                  const _CardInfoTile(
+                    icon: Icons.verified_user_outlined,
+                    title: 'حالة البطاقة',
+                    value: 'نشطة',
+                    valueColor: AppColors.success,
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            _DetailRow(
-              label: localizations.ministryOfHealth,
-              icon: Icons.account_balance_outlined,
-            ),
+
             const SizedBox(height: 24),
 
-            // إجراءات
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.download_outlined),
-                    label: Text(localizations.downloadCard),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+            Text(
+              'السجل الصحي',
+              style: AppTextStyles.heading3,
+            ),
+            const SizedBox(height: 12),
+
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: [
+                  ListTile(
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.folder_copy_outlined),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.share_outlined),
-                    label: Text(localizations.shareCard),
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                    title: const Text('الملفات الطبية'),
+                    subtitle: const Text(
+                      'عرض الملفات الموجودة في سجلك الصحي فقط',
                     ),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () {
+                      context.push('/patient/files');
+                    },
                   ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const CircleAvatar(
+                      child: Icon(Icons.medical_information_outlined),
+                    ),
+                    title: const Text('السجل الطبي'),
+                    subtitle: const Text(
+                      'عرض بياناتك الطبية الأساسية',
+                    ),
+                    trailing: const Icon(Icons.chevron_left_rounded),
+                    onTap: () {
+                      context.push('/patient/medical-record');
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            Center(
+              child: Text(
+                'DZ-HEALTHTECH',
+                textDirection: TextDirection.ltr,
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: AppColors.grey400,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
                 ),
-              ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+Widget _buildHealthCard({
+  required User user,
+  required String displayedNationalId,
+  String? qrData,
+}) {
+  return HealthCardWidget(
+    patientName: user.fullName,
+    nationalId: displayedNationalId,
+    bloodType: user.bloodType ?? 'غير محددة',
+    allergies: null,
+    chronicDiseases: null,
+    cardNumber: user.patientCode ?? 'غير متوفر',
+    validUntil: 'نشطة',
+    qrData: qrData,
+    showNationalId: _showNationalId,
+    onToggleNationalId: _toggleNationalId,
+    onOpenQr: qrData == null
+        ? null
+        : () => context.push('/patient/qr'),
+  );
+}
 }
 
-class _DetailRow extends StatelessWidget {
-  final String label;
-  final IconData icon;
+class _QrUnavailableBanner extends StatelessWidget {
+  final VoidCallback onRetry;
 
-  const _DetailRow({required this.label, required this.icon});
+  const _QrUnavailableBanner({
+    required this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: AppColors.grey400),
-        const SizedBox(width: 12),
-        Text(label, style: AppTextStyles.bodyLarge),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.errorLight,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.error.withValues(alpha: 0.20),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.qr_code_2_outlined,
+            color: AppColors.error,
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'تعذر تحميل رمز QR حاليًا. يمكنك إعادة المحاولة.',
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            child: const Text('إعادة'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CardInfoTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final Color? valueColor;
+
+  const _CardInfoTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: AppColors.primary,
+      ),
+      title: Text(title),
+      trailing: Flexible(
+        child: Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end,
+          style: AppTextStyles.bodyMedium.copyWith(
+            color: valueColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
 }

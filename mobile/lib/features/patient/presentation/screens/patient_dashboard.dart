@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:bitaqati_as_sihiya/features/emergency/presentation/providers/current_emergency_provider.dart';
 import 'package:bitaqati_as_sihiya/common/widgets/glass_card.dart';
 import 'package:bitaqati_as_sihiya/core/localization/app_localizations.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
-import 'package:bitaqati_as_sihiya/features/patient/presentation/widgets/health_card.dart';
 
 class PatientDashboard extends ConsumerStatefulWidget {
   const PatientDashboard({super.key});
@@ -34,7 +33,7 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
     final localizations = AppLocalizations.of(context);
     final authState = ref.watch(authProvider);
     final user = authState.user;
-
+    final currentEmergencyAsync = ref.watch(currentEmergencyProvider);
     if (user == null) {
       return Scaffold(
         appBar: AppBar(
@@ -52,7 +51,21 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
     final isProfileComplete = user.isProfileComplete;
     final userName = user.fullName;
     final nationalId = user.nationalId;
+currentEmergencyAsync.whenData((event) {
+  if (event == null || !mounted) return;
 
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!mounted) return;
+
+    if (event.status == 'active') {
+      context.go('/sos');
+    }
+
+    if (event.status == 'checked_in') {
+      context.go('/emergency/checked-in');
+    }
+  });
+});
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.home),
@@ -94,21 +107,23 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
             if (_showWelcome) _WelcomeBanner(userName: userName),
             if (_showWelcome) const SizedBox(height: 12),
 
-            // البطاقة الصحية في الأعلى
-            GestureDetector(
-              onTap: () {
-                context.go('/patient/health-card');
-              },
-              child: HealthCardWidget(
-                patientName: user.fullName,
-                nationalId: user.nationalId,
-                bloodType: user.bloodType ?? 'N/A',
-                allergies: 'None',
-                cardNumber: user.patientCode ?? 'N/A',
-                validUntil: '12/2028',
-              ),
-            ),
-            const SizedBox(height: 12),
+            Card(
+  clipBehavior: Clip.antiAlias,
+  child: ListTile(
+    leading: const CircleAvatar(
+      child: Icon(Icons.badge_outlined),
+    ),
+    title: const Text('صحتك تيك'),
+    subtitle: const Text(
+      'عرض بطاقتك الصحية الرقمية ورمز QR',
+    ),
+    trailing: const Icon(Icons.chevron_left_rounded),
+    onTap: () {
+      context.go('/patient/health-card');
+    },
+  ),
+),
+const SizedBox(height: 16),
 
             // Banner استكمال الملف الصحي
             if (!isProfileComplete) ...[
@@ -180,7 +195,7 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
             // زر SOS
             ElevatedButton.icon(
               onPressed: () {
-                context.push('/sos');
+                context.go('/sos');
               },
               icon: const Icon(Icons.warning_amber_rounded, size: 28),
               label: Text(
@@ -225,7 +240,7 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
                   label: localizations.sos,
                   color: AppColors.error,
                   onTap: () {
-                    context.push('/sos');
+                   context.go('/sos');
                   },
                 ),
                 _QuickActionItem(
@@ -287,30 +302,6 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
                   child: Text(localizations.viewAll),
                 ),
               ],
-            ),
-            const SizedBox(height: 12),
-            GlassCard(
-              child: Column(
-                children: const [
-                  _ActivityItem(
-                    icon: Icons.phone_in_talk_rounded,
-                    title: 'Checkup - Dr. Smith',
-                    subtitle: '2 days ago',
-                  ),
-                  Divider(height: 1),
-                  _ActivityItem(
-                    icon: Icons.vaccines_outlined,
-                    title: 'Vaccination scheduled',
-                    subtitle: 'Next week',
-                  ),
-                  Divider(height: 1),
-                  _ActivityItem(
-                    icon: Icons.description_outlined,
-                    title: 'Lab results available',
-                    subtitle: 'Yesterday',
-                  ),
-                ],
-              ),
             ),
           ],
         ),

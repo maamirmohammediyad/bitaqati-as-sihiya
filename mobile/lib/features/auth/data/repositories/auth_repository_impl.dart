@@ -242,46 +242,33 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   // ---------------- getCurrentUser ----------------
-
 @override
 Future<Either<Failure, User>> getCurrentUser() async {
   try {
-    final userId = await _secureStorage.getUserId();
-    final role = await _secureStorage.getUserRole();
+    final userJson = await _secureStorage.getUserJson();
     final loginAt = await _secureStorage.getLoginTimestamp();
 
-    if (userId == null || role == null || loginAt == null) {
+    if (userJson == null || loginAt == null) {
       return const Left(
         Failure(message: 'No authenticated user'),
       );
     }
 
-    final now = DateTime.now();
-    final diff = now.difference(loginAt);
-
-    // لو مر أكثر من يوم => اعتبر الجلسة منتهية
-    if (diff.inHours >= 24) {
+    if (DateTime.now().difference(loginAt).inHours >= 24) {
       await _clearAuthData();
+
       return const Left(
         Failure(message: 'Session expired'),
       );
     }
 
-    return Right(
-      User(
-        id: userId,
-        nationalId: '',
-        firstName: '',
-        lastName: '',
-        role: role,
-        createdAt: DateTime.now(),
-      ),
-    );
+    final decoded = jsonDecode(userJson) as Map<String, dynamic>;
+    return Right(User.fromJson(decoded));
   } catch (e) {
+    await _clearAuthData();
     return Left(Failure(message: e.toString(), error: e));
   }
 }
-
   // ---------------- helpers ----------------
 
   Future<void> _saveAuthData(LoginResponse response) async {
@@ -300,4 +287,59 @@ Future<Either<Failure, User>> getCurrentUser() async {
   Future<void> _clearAuthData() async {
     await _secureStorage.clearAll();
   }
+  @override
+Future<Either<Failure, User>> updateGuardianProfile({
+  required String name,
+  required String phone,
+  String? email,
+}) async {
+  try {
+    final response = await _remoteDataSource.updateGuardianProfile(
+      name: name,
+      phone: phone,
+      email: email,
+    );
+
+    final data = response['data'] as Map<String, dynamic>;
+    final user = User.fromJson(data);
+
+    await _secureStorage.saveUserJson(jsonEncode(user.toJson()));
+
+    return Right(user);
+  } on DioException catch (e) {
+    final exception = mapDioException(e);
+    return Left(Failure(
+      message: exception.message,
+      error: exception,
+    ));
+  } catch (e) {
+    return Left(Failure(message: e.toString(), error: e));
+  }
+}
+@override
+Future<Either<Failure, void>> updatePassword({
+  required String currentPassword,
+  required String password,
+  required String passwordConfirmation,
+}) async {
+  try {
+    await _remoteDataSource.updatePassword(
+      currentPassword: currentPassword,
+      password: password,
+      passwordConfirmation: passwordConfirmation,
+    );
+
+    await _clearAuthData();
+
+    return const Right(null);
+  } on DioException catch (e) {
+    final exception = mapDioException(e);
+    return Left(Failure(
+      message: exception.message,
+      error: exception,
+    ));
+  } catch (e) {
+    return Left(Failure(message: e.toString(), error: e));
+  }
+}
 }

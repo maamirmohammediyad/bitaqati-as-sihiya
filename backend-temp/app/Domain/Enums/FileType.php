@@ -9,6 +9,7 @@ enum FileType: string
     case Analysis = 'analysis';
     case Xray = 'xray';
     case Prescription = 'prescription';
+    case Report = 'report';
     case Pdf = 'pdf';
     case Other = 'other';
 }

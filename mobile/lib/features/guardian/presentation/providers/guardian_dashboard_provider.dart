@@ -1,10 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:bitaqati_as_sihiya/core/network/api_client.dart';
+import 'package:bitaqati_as_sihiya/core/constants/api_constants.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/domain/entities/guardian_patient_dashboard.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/domain/repositories/guardian_repository.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/data/datasources/guardian_remote_datasource.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/domain/repositories/guardian_repository_impl.dart';
-import 'package:bitaqati_as_sihiya/core/network/api_client.dart';
 import 'package:bitaqati_as_sihiya/main.dart'; // للوصول إلى flutterLocalNotificationsPlugin
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 // Provider للـ dataSource
@@ -26,29 +27,21 @@ final guardianRepositoryProvider = Provider<GuardianRepository>(
 // FutureProvider.family لجلب Dashboard حسب patientId
 final guardianPatientDashboardProvider =
 // حالة وجود طوارئ غير مقروءة لكل مريض (حسب patientId)
-  FutureProvider.family<GuardianPatientDashboard, String>((ref, patientId) {
-  final repo = ref.watch(guardianRepositoryProvider);
-  return repo.getPatientDashboard(patientId);
-});
-final unreadEmergencyProvider =
-  StateProvider.family<bool, String>((ref, patientId) => false);
-final guardianPatientDashboardWithNotifyProvider = FutureProvider.family<
-    GuardianPatientDashboard, String>((ref, patientId) async {
-  final dashboard =
-      await ref.watch(guardianPatientDashboardProvider(patientId).future);
+    FutureProvider.autoDispose.family<GuardianPatientDashboard, String>(
+  (ref, patientId) {
+    final repo = ref.watch(guardianRepositoryProvider);
+    return repo.getPatientDashboard(patientId);
+  },
+);
 
-  final prevUnread =
-      ref.read(unreadEmergencyProvider(patientId)); // القيمة السابقة
-  final emergencyCount = dashboard.emergency.count;
-
-  // لو كان عدد الطوارئ > 0 ولم نكن نعتبرها "مقروءة"، نرسل إشعار ونشغل النقطة
-  if (emergencyCount > 0 && !prevUnread) {
-    await _showEmergencyNotification(dashboard);
-    ref.read(unreadEmergencyProvider(patientId).notifier).state = true;
-  }
-
-  return dashboard;
-});
+final guardianPatientDashboardWithNotifyProvider =
+    FutureProvider.autoDispose.family<GuardianPatientDashboard, String>(
+  (ref, patientId) async {
+    return ref.watch(
+      guardianPatientDashboardProvider(patientId).future,
+    );
+  },
+);
 
 Future<void> _showEmergencyNotification(
     GuardianPatientDashboard dashboard) async {
@@ -71,4 +64,17 @@ Future<void> _showEmergencyNotification(
     platformDetails,
     payload: 'emergency:${patient.id}',
   );
+
 }
+
+final guardianPatientQrTokenProvider = FutureProvider.autoDispose
+    .family<String, String>((ref, patientId) async {
+  final apiClient = ref.watch(apiClientProvider);
+
+  final response = await apiClient.post(
+    ApiConstants.guardianPatientQrToken(patientId),
+  );
+
+  final data = response.data['data'] as Map<String, dynamic>;
+  return data['token'] as String;
+});

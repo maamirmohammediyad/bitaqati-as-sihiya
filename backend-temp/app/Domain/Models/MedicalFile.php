@@ -46,38 +46,4 @@ class MedicalFile extends Model
     {
         return $this->belongsTo(User::class);
     }
-    public function uploadMedicalFile(Request $request, string $id): JsonResponse
-{
-    /** @var User $guardian */
-    $guardian = auth()->user();
-
-    $patient = $guardian->patients()->where('id', $id)->firstOrFail();
-
-    $validated = $request->validate([
-        'file'        => ['required', 'file', 'max:10240'], // 10MB
-        'file_type'   => ['nullable', 'string', 'max:50'],
-        'description' => ['nullable', 'string', 'max:255'],
-    ]);
-
-    $uploadedFile = $validated['file'];
-
-    $path = $uploadedFile->store('medical_files/'.$patient->id, 'public');
-
-    $medicalFile = MedicalFile::create([
-        'user_id'      => $patient->id,
-        'original_name'=> $uploadedFile->getClientOriginalName(),
-        'storage_path' => $path,
-        'mime_type'    => $uploadedFile->getClientMimeType(),
-        'size_bytes'   => $uploadedFile->getSize(),
-        // file_type عندك Enum FileType، هنا نستقبل string ونحوّله إذا شئت:
-        'file_type'    => isset($validated['file_type'])
-            ? \App\Domain\Enums\FileType::from($validated['file_type'])
-            : null,
-        'description'  => $validated['description'] ?? null,
-    ]);
-
-    return response()->json([
-        'data' => new MedicalFileResource($medicalFile),
-    ], 201);
-}
 }

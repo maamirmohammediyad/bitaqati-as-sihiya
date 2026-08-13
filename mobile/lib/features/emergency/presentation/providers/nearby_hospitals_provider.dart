@@ -34,13 +34,19 @@ final nearbyHospitalsCountProvider =
       'lng': position.longitude,
     },
   );
+  final rawResponse = response.data;
 
-  print('NEARBY HOSPITALS RESPONSE: ${response.data}');
+if (rawResponse is! Map) {
+  return 0;
+}
 
+final data = Map<String, dynamic>.from(rawResponse);
+final rawCount = data['count'];
 
-  final data = response.data;
-  final count = data['count'] as int? ??
-      (data['data'] as List<dynamic>? ?? []).length;
- print('NEARBY HOSPITALS COUNT: $count');
-  return count;
+if (rawCount is num) {
+  return rawCount.toInt();
+}
+
+final hospitals = data['data'];
+return hospitals is List ? hospitals.length : 0;
 });

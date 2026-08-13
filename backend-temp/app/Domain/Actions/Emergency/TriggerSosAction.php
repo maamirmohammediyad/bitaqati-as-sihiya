@@ -21,6 +21,15 @@ class TriggerSosAction
     public function execute(string $userId, array $data): EmergencyEvent
     {
         return DB::transaction(function () use ($userId, $data): EmergencyEvent {
+$existingEvent = EmergencyEvent::query()
+    ->where('user_id', $userId)
+    ->whereIn('status', ['active', 'checked_in'])
+    ->latest('created_at')
+    ->first();
+
+if ($existingEvent !== null) {
+    return $existingEvent;
+}
             $latitude  = $data['latitude'] ?? null;
             $longitude = $data['longitude'] ?? null;
 
@@ -119,6 +128,7 @@ class TriggerSosAction
             $this->auditLogService->logSosTrigger($userId, $event->id);
 
             return $event->fresh();
+
         });
     }
 }

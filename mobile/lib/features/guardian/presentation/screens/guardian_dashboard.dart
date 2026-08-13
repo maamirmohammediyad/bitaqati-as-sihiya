@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-
 import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bitaqati_as_sihiya/features/guardian/domain/entities/guardian_patient_dashboard.dart';
@@ -23,7 +21,7 @@ class GuardianDashboard extends ConsumerWidget {
       );
     }
 
-    final patients = user.patients ?? [];
+    final patients = user.patients;
     final patient = patients.isNotEmpty ? patients.first : null;
 
     return PopScope(
@@ -210,8 +208,14 @@ class _GuardianDashboardContent extends ConsumerWidget {
     final weight =
         profile?.weightKg != null ? '${profile!.weightKg} كغ' : 'غير محدد';
 
-    final hasUnreadEmergency =
-        ref.watch(unreadEmergencyProvider(patient.id));
+  final emergenciesAsync = ref.watch(
+  guardianPatientEmergenciesProvider(patient.id),
+);
+
+final hasUnreadEmergency = emergenciesAsync.maybeWhen(
+  data: (events) => events.any((event) => !event.isRead),
+  orElse: () => false,
+);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -237,31 +241,36 @@ class _GuardianDashboardContent extends ConsumerWidget {
                   emergencyCount: emergencyCount,
                   lastEmergencyAt: lastEmergencyAt,
                   hasUnreadEmergency: hasUnreadEmergency,
-                  onTap: () {
-                    ref
-                        .read(unreadEmergencyProvider(patient.id).notifier)
-                        .state = false;
-                    context.goNamed(
-                      'guardianPatientEmergencies',
-                      pathParameters: {'id': patient.id},
-                      extra: patient.fullName,
-                    );
-                  },
+                  onTap: () async {
+  await context.pushNamed(
+    'guardianPatientEmergencies',
+    pathParameters: {'id': patient.id},
+    extra: patient.fullName,
+  );
+
+  ref.invalidate(guardianPatientEmergenciesProvider(patient.id));
+  ref.invalidate(guardianPatientDashboardProvider(patient.id));
+  ref.invalidate(
+    guardianPatientDashboardWithNotifyProvider(patient.id),
+  );
+},
                 ),
 
                 const SizedBox(height: 12),
 
-                // بطاقة المريض + QR
-                _PatientQrCard(
-                  patientName: patient.fullName,
-                  nationalId: patient.nationalId,
-                  patientCode: patient.patientCode ?? '',
-                  bloodGroup: bloodGroup,
-                  gender: gender,
-                  dateOfBirth: dateOfBirth,
-                ),
+Card(
+  child: ListTile(
+    leading: const CircleAvatar(
+      child: Icon(Icons.badge_outlined),
+    ),
+    title: const Text('بطاقة المريض الصحية'),
+    subtitle: const Text('عرض رمز QR والبيانات الطبية الأساسية'),
+    trailing: const Icon(Icons.chevron_left_rounded),
+    onTap: () => context.go('/guardian/card'),
+  ),
+),
 
-                const SizedBox(height: 12),
+const SizedBox(height: 12),
 
                 // حالة اكتمال الملف
                 Card(
@@ -282,18 +291,29 @@ class _GuardianDashboardContent extends ConsumerWidget {
                       'يمكنك تعديل/إكمال بيانات المريض (التاريخ المرضي، الأدوية، الحساسية...).',
                       style: AppTextStyles.bodySmall,
                     ),
-                    trailing: TextButton(
-                      onPressed: () {
-                        context.goNamed(
-                          'guardianPatientCompleteProfile',
-                          extra: {
-                          'patientId': patient.id,
-                          'profile': dashboard.profile,
-                          },
-                        );
-                      },
-                      child: const Text('إدارة الملف'),
-                    ),
+trailing: TextButton(
+  onPressed: () async {
+    final wasUpdated = await context.pushNamed<bool>(
+      'guardianPatientCompleteProfile',
+      pathParameters: {
+        'patientId': patient.id,
+      },
+    );
+
+    debugPrint('wasUpdated = $wasUpdated');
+
+    if (wasUpdated == true && context.mounted) {
+      debugPrint('Refreshing dashboard for patient: ${patient.id}');
+        ref.invalidate(
+    guardianPatientDashboardProvider(patient.id),
+      );
+      ref.invalidate(
+        guardianPatientDashboardWithNotifyProvider(patient.id),
+      );
+    }
+  },
+  child: const Text('إدارة الملف'),
+),
                   ),
                 ),
 
@@ -385,12 +405,12 @@ class _GuardianDashboardContent extends ConsumerWidget {
                           alignment: Alignment.centerLeft,
                           child: TextButton(
                             onPressed: () {
-                              context.goNamed(
-                                'guardianPatientMedicalFiles',
-                                pathParameters: {'id': patient.id},
-                                extra: patient,
-                              );
-                            },
+  context.pushNamed(
+    'guardianPatientMedicalFiles',
+    pathParameters: {'id': patient.id},
+    extra: patient,
+  );
+},
                             child: const Text('عرض الملفات ورفع ملف جديد'),
                           ),
                         ),
@@ -483,101 +503,6 @@ class _EmergencyBanner extends StatelessWidget {
             const Icon(Icons.chevron_left),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _PatientQrCard extends StatelessWidget {
-  final String patientName;
-  final String nationalId;
-  final String patientCode;
-  final String bloodGroup;
-  final String gender;
-  final String dateOfBirth;
-
-  const _PatientQrCard({
-    required this.patientName,
-    required this.nationalId,
-    required this.patientCode,
-    required this.bloodGroup,
-    required this.gender,
-    required this.dateOfBirth,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final qrData = patientCode.isNotEmpty ? patientCode : nationalId;
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            QrImageView(
-              data: qrData,
-              size: 90,
-              backgroundColor: Colors.white,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    patientName,
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'الرقم الوطني: $nationalId',
-                    style: AppTextStyles.bodySmall,
-                  ),
-                  if (patientCode.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      'كود المريض: $patientCode',
-                      style: AppTextStyles.bodySmall,
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
-                    children: [
-                      _SmallTag('فصيلة الدم: $bloodGroup'),
-                      _SmallTag('الجنس: $gender'),
-                      _SmallTag('الميلاد: $dateOfBirth'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SmallTag extends StatelessWidget {
-  final String text;
-  const _SmallTag(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        text,
-        style: AppTextStyles.bodySmall,
       ),
     );
   }

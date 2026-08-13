@@ -40,13 +40,37 @@ class ApiConstants {
   static const String linkPatient = '/guardian/link-patient';
   static const String unlinkPatient = '/guardian/unlink-patient';
   static String guardianPatientMedicalFiles(String patientId) =>'/guardian/patient/$patientId/medical-files';
+  static const updateGuardianProfile = '/auth/profile';
+static const updatePassword = '/auth/password';
+static String guardianPatientQrToken(String patientId) => '/guardian/patient/$patientId/qr-token';
   // Emergency
-  static const String emergencyGuardians = '/emergency/guardians';
-  static const String sosTrigger = '/emergency/sos';
-  static const String sosCancel = '/emergency/sos/cancel';
-  static const String emergencyContacts = '/emergency/contacts';
-  static const String emergencyHistory = '/emergency/history';
-  static String guardianPatientEmergencies(String patientId) => '/guardian/patient/$patientId/emergencies';
+static const String emergencyGuardians = '/emergency/guardians';
+static const String sosTrigger = '/emergency/sos';
+static const String emergencyCurrent = '/emergency/current';
+static const String emergencyContacts = '/emergency/contacts';
+static const String emergencyHistory = '/emergency/history';
+
+static String sosCancel(String eventId) =>
+    '/emergency/$eventId/cancel';
+
+static String sosCheckIn(String eventId) =>
+    '/emergency/$eventId/check-in';
+
+static String guardianPatientEmergencies(String patientId) =>
+    '/guardian/patient/$patientId/emergencies';
+
+static String guardianPatientEmergencyRead(
+  String patientId,
+  String eventId,
+) {
+  return '/guardian/patient/$patientId/emergencies/$eventId/read';
+}
+
+static String guardianPatientEmergencyDetail(
+  String patientId,
+  String eventId,
+) =>
+    '/guardian/patient/$patientId/emergencies/$eventId';
   // Hospitals
   static const String nearbyHospitals = '/hospitals/nearby';
   static const String hospitals = '/hospitals';

@@ -79,11 +79,11 @@ Future<void> _pickAndUploadFile(
     final repo = ref.read(guardianMedicalFilesRepositoryProvider);
 
     final uploaded = await repo.uploadPatientMedicalFile(
-      patientId: patientId,
-      file: file,
-      description: xfile.name,
-      fileType: 'document',
-    );
+  patientId: patientId,
+  file: file,
+  description: xfile.name,
+  fileType: _fileTypeFromName(xfile.name),
+);
 
     ref.invalidate(guardianPatientMedicalFilesProvider(patientId));
 
@@ -181,4 +181,13 @@ final subtitleText =
       },
     );
   }
+  String _fileTypeFromName(String fileName) {
+  final name = fileName.toLowerCase();
+
+  if (name.endsWith('.pdf')) {
+    return 'pdf';
+  }
+
+  return 'other';
+}
 }

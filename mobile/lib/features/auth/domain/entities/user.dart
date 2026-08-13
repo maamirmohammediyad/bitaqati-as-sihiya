@@ -33,7 +33,7 @@ class User {
     this.patients = const [], // قيمة افتراضية فارغة
   });
 
-  String get fullName => '$firstName $lastName';
+String get fullName => '$firstName $lastName'.trim().replaceAll(RegExp(r'\s+'), ' ');
 
   bool get isPatient => role == 'patient';
   bool get isGuardian => role == 'guardian';
@@ -129,9 +129,10 @@ class User {
       final patientCode = root['patient_code'] as String?;
 
       final isProfileComplete =
-          profile?['is_profile_complete'] as bool? ??
-          root['is_profile_completed'] as bool? ??
-          false;
+    profile?['is_profile_complete'] as bool? ??
+    root['is_profile_complete'] as bool? ??
+    root['is_profile_completed'] as bool? ??
+    false;
       final dateOfBirthStr = profile?['date_of_birth'] as String?;
       // جديد: قراءة قائمة المرضى (لو موجودة) – هنا نفترض أن JSON المريض الواحد
       // هو مباشرة نفس الشكل (بدون data.user)، كما في مثال الـ guardian الذي أرسلته.

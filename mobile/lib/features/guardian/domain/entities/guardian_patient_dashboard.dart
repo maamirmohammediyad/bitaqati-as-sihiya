@@ -65,28 +65,34 @@ class PatientProfileSummary {
   final double? heightCm;
   final double? weightKg;
   final bool isProfileComplete;
+  final String? allergies;
+  final String? chronicDiseases;
 
   const PatientProfileSummary({
-    required this.fullName,
-    required this.dateOfBirth,
-    required this.bloodGroup,
-    required this.gender,
-    required this.heightCm,
-    required this.weightKg,
-    required this.isProfileComplete,
-  });
+  required this.fullName,
+  required this.dateOfBirth,
+  required this.bloodGroup,
+  required this.gender,
+  required this.heightCm,
+  required this.weightKg,
+  required this.isProfileComplete,
+  this.allergies,
+  this.chronicDiseases,
+});
 
   factory PatientProfileSummary.fromJson(Map<String, dynamic> json) {
-    return PatientProfileSummary(
-      fullName: json['full_name'] as String?,
-      dateOfBirth: json['date_of_birth'] as String?,
-      bloodGroup: json['blood_group'] as String?,
-      gender: json['gender'] as String?,
-      heightCm: (json['height_cm'] as num?)?.toDouble(),
-      weightKg: (json['weight_kg'] as num?)?.toDouble(),
-      isProfileComplete: (json['is_profile_complete'] as bool?) ?? false,
-    );
-  }
+  return PatientProfileSummary(
+    fullName: json['full_name']?.toString(),
+    dateOfBirth: json['date_of_birth']?.toString(),
+    bloodGroup: json['blood_group']?.toString(),
+    gender: json['gender']?.toString(),
+    heightCm: (json['height_cm'] as num?)?.toDouble(),
+    weightKg: (json['weight_kg'] as num?)?.toDouble(),
+    allergies: json['allergies']?.toString(),
+    chronicDiseases: json['chronic_diseases']?.toString(),
+    isProfileComplete: json['is_profile_complete'] == true,
+  );
+}
 }
 
 /// ملخص بيانات الطوارئ للمريض
