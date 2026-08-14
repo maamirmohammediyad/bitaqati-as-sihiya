@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
-
+use App\Http\Requests\Emergency\ResolveHospitalEmergencyRequest;
 use App\Domain\Actions\Emergency\TriggerSosAction;
 use App\Domain\Models\EmergencyEvent;
 use App\Http\Controllers\Controller;
@@ -83,7 +83,7 @@ public function cancel(string $id, Request $request): JsonResponse
         'message' => 'تم إلغاء نداء الطوارئ وحذفه.',
     ]);
 }
-public function checkIn(Request $request, string $id)
+public function checkIn(Request $request, string $id): JsonResponse
 {
     $hospitalId = $request->attributes->get('hospital_id');
 
@@ -93,25 +93,109 @@ public function checkIn(Request $request, string $id)
         ], 403);
     }
 
-    $event = EmergencyEvent::query()->findOrFail($id);
+    $updated = EmergencyEvent::query()
+        ->whereKey($id)
+        ->where('status', 'active')
+        ->update([
+            'status' => 'checked_in',
+            'checked_in_hospital_id' => $hospitalId,
+            'checked_in_at' => now(),
+        ]);
 
-    if ($event->status !== 'active') {
+    if ($updated === 0) {
+        $exists = EmergencyEvent::query()
+            ->whereKey($id)
+            ->exists();
+
         return response()->json([
-            'message' => 'لا يمكن تسجيل وصول هذه الحالة.',
-        ], 422);
+            'message' => $exists
+                ? 'لا يمكن تسجيل وصول هذه الحالة لأنها سُجلت أو أُغلقت مسبقًا.'
+                : 'حالة الطوارئ غير موجودة.',
+        ], $exists ? 422 : 404);
     }
 
-    $event->update([
-        'status' => 'checked_in',
-        'checked_in_hospital_id' => $hospitalId,
-        'checked_in_at' => now(),
-    ]);
+    $event = EmergencyEvent::query()
+        ->with([
+            'user:id,name,phone,patient_code',
+            'checkedInHospital:id,name,phone,address,city',
+        ])
+        ->findOrFail($id);
 
     return response()->json([
         'message' => 'تم تسجيل وصول المريض بنجاح.',
-        'data' => $event->fresh(),
+        'data' => new EmergencyEventResource($event),
     ]);
 }
+
+public function resolveByHospital(
+    ResolveHospitalEmergencyRequest $request,
+    string $id,
+): JsonResponse {
+    $hospitalId = $request->attributes->get('hospital_id');
+
+    if ($hospitalId === null) {
+        return response()->json([
+            'message' => 'تعذر تحديد المستشفى.',
+        ], 403);
+    }
+
+    $updated = EmergencyEvent::query()
+        ->whereKey($id)
+        ->where('status', 'checked_in')
+        ->where('checked_in_hospital_id', $hospitalId)
+        ->update([
+            'status' => 'resolved',
+            'resolved_at' => now(),
+            'resolved_by' => $request->user()->id,
+            'resolution_notes' => $request->validated('resolution_notes'),
+        ]);
+
+    if ($updated === 0) {
+    $event = EmergencyEvent::query()->find($id);
+
+    if ($event === null) {
+        return response()->json([
+            'message' => 'حالة الطوارئ غير موجودة.',
+        ], 404);
+    }
+
+    if ($event->checked_in_hospital_id === null) {
+        return response()->json([
+            'message' => 'يجب تسجيل وصول الحالة إلى مستشفى أولًا.',
+        ], 422);
+    }
+
+    if ($event->checked_in_hospital_id !== $hospitalId) {
+        return response()->json([
+            'message' => 'لا تملك صلاحية إنهاء حالة تابعة لمستشفى آخر.',
+        ], 403);
+    }
+
+    if ($event->status === 'resolved') {
+        return response()->json([
+            'message' => 'تم إنهاء هذه الحالة مسبقًا.',
+        ], 422);
+    }
+
+    return response()->json([
+        'message' => 'الحالة ليست في مرحلة تسمح بإنهائها.',
+    ], 422);
+}
+
+    $event = EmergencyEvent::query()
+        ->with([
+            'user:id,name,phone,patient_code',
+            'checkedInHospital:id,name,phone,address,city',
+            'resolver:id,name',
+        ])
+        ->findOrFail($id);
+
+    return response()->json([
+        'message' => 'تم إنهاء حالة الطوارئ بنجاح.',
+        'data' => new EmergencyEventResource($event),
+    ]);
+}
+
     public function history(Request $request): JsonResponse
     {
         $events = EmergencyEvent::where('user_id', $request->user()->id)

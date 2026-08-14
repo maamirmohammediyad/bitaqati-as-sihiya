@@ -24,10 +24,18 @@ class EnsureHospitalStaff
             ], 403);
         }
 
-        $allowedRoleValues = array_map(
-            static fn (string $role): string => HospitalUserRole::from($role)->value,
-            $allowedRoles,
-        );
+        $allowedRoleValues = collect($allowedRoles)
+            ->map(static fn (string $role) => HospitalUserRole::tryFrom($role))
+            ->filter()
+            ->map(static fn (HospitalUserRole $role) => $role->value)
+            ->values()
+            ->all();
+
+        if ($allowedRoles !== [] && $allowedRoleValues === []) {
+            return response()->json([
+                'message' => 'إعداد صلاحيات المستشفى غير صحيح.',
+            ], 500);
+        }
 
         $hospitalUser = $user->hospitalUsers()
             ->where('is_active', true)

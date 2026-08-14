@@ -68,5 +68,11 @@ protected function casts(): array
         'emergency_event_id',
     );
 }
-
+public function notes(): HasMany
+{
+    return $this->hasMany(
+        EmergencyEventNote::class,
+        'emergency_event_id',
+    );
+}
 }

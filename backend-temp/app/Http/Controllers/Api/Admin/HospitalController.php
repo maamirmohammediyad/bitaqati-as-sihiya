@@ -13,7 +13,7 @@ use App\Http\Requests\Admin\StoreHospitalRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-
+use App\Domain\Enums\HospitalUserRole;
 class HospitalController extends Controller
 {
     public function index(): JsonResponse
@@ -71,9 +71,10 @@ class HospitalController extends Controller
                 'is_active' => true,
             ]);
 
-            $hospital->users()->attach($user->id, [
+           $hospital->hospitalUsers()->create([
     'id' => (string) Str::uuid(),
-    'role' => 'hospital_admin',
+    'user_id' => $user->id,
+    'role' => HospitalUserRole::Admin,
     'is_active' => true,
     'joined_at' => now(),
 ]);

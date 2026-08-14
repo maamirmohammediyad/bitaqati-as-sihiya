@@ -17,6 +17,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Domain\Models\MedicalFile;
 use App\Domain\Enums\HospitalUserRole;
+use App\Domain\Models\HospitalUser;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasUuids, Notifiable;
