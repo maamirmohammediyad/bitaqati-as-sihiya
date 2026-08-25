@@ -93,11 +93,14 @@ class LoginAction
             ]);
         }
 
-        if (! $user->is_active) {
-            throw ValidationException::withMessages([
-                $errorField => ['تم تعطيل هذا الحساب.'],
-            ]);
-        }
+        if (
+    $user->role === UserRole::HealthWorker
+    && ! $user->is_active
+) {
+    throw ValidationException::withMessages([
+        $errorField => ['تم تعطيل حساب الموظف الصحي. يرجى التواصل مع الإدارة.'],
+    ]);
+}
 
         $token = $user->createToken('auth-token')->plainTextToken;
 

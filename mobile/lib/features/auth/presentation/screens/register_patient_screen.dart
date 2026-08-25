@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:flutter/services.dart';
 import 'package:bitaqati_as_sihiya/common/widgets/app_button.dart';
 import 'package:bitaqati_as_sihiya/common/widgets/app_text_field.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
@@ -30,6 +30,7 @@ class _RegisterPatientScreenState
 
   // خيار: هل هذا الحساب سيكون وليًا أيضًا؟
   bool _isGuardian = false;
+  bool _hasAcceptedTerms = false;
   final _patientNationalIdController = TextEditingController();
   String? _relationship;
   @override
@@ -110,7 +111,12 @@ class _RegisterPatientScreenState
                 hintText: 'Enter your first name',
                 controller: _firstNameController,
                 prefixIcon: Icons.person_outline,
-                validator: (v) => Validators.name(v, 'First name'),
+                validator: (v) => Validators.latinName(v, 'الاسم الأول'),
+                inputFormatters: [
+  FilteringTextInputFormatter.allow(
+    RegExp(r"[A-Za-zÀ-ÖØ-öø-ÿ' -]"),
+  ),
+],
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
@@ -119,7 +125,12 @@ class _RegisterPatientScreenState
                 hintText: 'Enter your last name',
                 controller: _lastNameController,
                 prefixIcon: Icons.person_outline,
-                validator: (v) => Validators.name(v, 'Last name'),
+                validator: (v) => Validators.latinName(v, 'اللقب'),
+                inputFormatters: [
+  FilteringTextInputFormatter.allow(
+    RegExp(r"[A-Za-zÀ-ÖØ-öø-ÿ' -]"),
+  ),
+],
                 textInputAction: TextInputAction.next,
               ),
               const SizedBox(height: 16),
@@ -173,7 +184,38 @@ class _RegisterPatientScreenState
                 controlAffinity: ListTileControlAffinity.leading,
                 contentPadding: EdgeInsets.zero,
               ),
-
+              CheckboxListTile(
+  value: _hasAcceptedTerms,
+  onChanged: (value) {
+    setState(() => _hasAcceptedTerms = value ?? false);
+  },
+  controlAffinity: ListTileControlAffinity.leading,
+  contentPadding: EdgeInsets.zero,
+  title: Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      const Text(
+        'أوافق على ',
+        style: AppTextStyles.bodyMedium,
+      ),
+      TextButton(
+        onPressed: () {
+          // غيّر المسار عند إنشاء شاشة الشروط والبنود.
+          // context.push('/terms-and-conditions');
+        },
+        style: TextButton.styleFrom(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: const Text(
+          'الشروط والبنود',
+          style: AppTextStyles.link,
+        ),
+      ),
+    ],
+  ),
+),
               // إذا اختار أنه ولي → نظهر حقل رقم تعريف المريض المرتبط
 if (_isGuardian) ...[
   const SizedBox(height: 8),
@@ -223,10 +265,12 @@ if (_isGuardian) ...[
 ],
               const SizedBox(height: 32),
               AppButton(
-                label: 'Register',
-                onPressed: _handleRegister,
-                isLoading: authState.isLoading,
-              ),
+  label: _hasAcceptedTerms
+      ? 'Register'
+      : 'Accept terms and conditions first',
+  onPressed: _hasAcceptedTerms ? _handleRegister : null,
+  isLoading: authState.isLoading,
+),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -252,6 +296,15 @@ if (_isGuardian) ...[
   }
 
   void _handleRegister() {
+      if (!_hasAcceptedTerms) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('يرجى الموافقة على الشروط والبنود أولًا.'),
+        backgroundColor: AppColors.error,
+      ),
+    );
+    return;
+  }
   if (_formKey.currentState?.validate() ?? false) {
     final notifier = ref.read(authProvider.notifier);
 

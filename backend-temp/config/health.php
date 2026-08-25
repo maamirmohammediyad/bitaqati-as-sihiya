@@ -73,7 +73,7 @@ return [
     | Default bucket names used for medical file storage.
     |
     */
-
+    
     'supabase_buckets' => [
         'medical_files' => 'medical-files',
         'avatars' => 'avatars',

@@ -13,8 +13,10 @@ class GuardianPatientCardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final patients = ref.watch(authProvider).user?.patients ?? const [];
+    final guardian = ref.watch(authProvider).user;
+    final patients = guardian?.patients ?? const [];
     final patient = patients.isEmpty ? null : patients.first;
+    final guardianVerified = guardian?.isVerificationApproved ?? false;
 
     if (patient == null) {
       return const Directionality(
@@ -37,9 +39,21 @@ class GuardianPatientCardScreen extends ConsumerWidget {
       guardianPatientDashboardProvider(patient.id),
     );
 
-    final qrTokenAsync = ref.watch(
-      guardianPatientQrTokenProvider(patient.id),
-    );
+    final qrTokenAsync = guardianVerified
+        ? ref.watch(guardianPatientQrTokenProvider(patient.id))
+        : null;
+
+    Future<void> refresh() async {
+      ref.invalidate(guardianPatientDashboardProvider(patient.id));
+
+      if (guardianVerified) {
+        ref.invalidate(guardianPatientQrTokenProvider(patient.id));
+      }
+
+      await ref.read(
+        guardianPatientDashboardProvider(patient.id).future,
+      );
+    }
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -61,26 +75,21 @@ class GuardianPatientCardScreen extends ConsumerWidget {
             },
           ),
           data: (dashboard) => RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(
-                guardianPatientDashboardProvider(patient.id),
-              );
-
-              ref.invalidate(
-                guardianPatientQrTokenProvider(patient.id),
-              );
-
-              await ref.read(
-                guardianPatientDashboardProvider(patient.id).future,
-              );
-            },
+            onRefresh: refresh,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.all(16),
               children: [
+                if (!guardianVerified) ...[
+                  _VerificationRequiredCard(
+                    verificationStatus: guardian?.verificationStatus,
+                  ),
+                  const SizedBox(height: 16),
+                ],
                 _PatientIdentityCard(
                   dashboard: dashboard,
                   qrTokenAsync: qrTokenAsync,
+                  canShowQr: guardianVerified,
                 ),
                 const SizedBox(height: 16),
                 _MedicalSummaryCard(
@@ -112,26 +121,6 @@ class GuardianPatientCardScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 16),
-                _ProfileStatusCard(
-                  dashboard: dashboard,
-                  onPressed: () async {
-                    final wasUpdated = await context.pushNamed<bool>(
-                      'guardianPatientCompleteProfile',
-                      pathParameters: {
-                        'patientId': dashboard.patient.id,
-                      },
-                    );
-
-                    if (wasUpdated == true) {
-                      ref.invalidate(
-                        guardianPatientDashboardProvider(
-                          dashboard.patient.id,
-                        ),
-                      );
-                    }
-                  },
-                ),
                 const SizedBox(height: 24),
               ],
             ),
@@ -142,19 +131,91 @@ class GuardianPatientCardScreen extends ConsumerWidget {
   }
 }
 
+class _VerificationRequiredCard extends StatelessWidget {
+  final String? verificationStatus;
+
+  const _VerificationRequiredCard({
+    required this.verificationStatus,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final status = verificationStatus?.trim().toLowerCase() ?? '';
+    final isPending = status == 'pending';
+    final isRejected = status == 'rejected';
+
+    final color = isRejected ? Colors.red : Colors.orange;
+    final title = isRejected
+        ? 'تم رفض طلب التحقق'
+        : isPending
+            ? 'طلب التحقق قيد المراجعة'
+            : 'التحقق من الحساب مطلوب';
+
+    final message = isRejected
+        ? 'لا يمكن عرض رمز QR للمريض حتى يتم تقديم مستند تحقق جديد واعتماده.'
+        : isPending
+            ? 'سيظهر رمز QR للمريض بعد اعتماد طلب التحقق من الإدارة.'
+            : 'يجب رفع مستند إثبات الهوية واعتماد الحساب قبل عرض رمز QR للمريض.';
+
+    return Card(
+      color: color.withValues(alpha: 0.08),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              backgroundColor: color.withValues(alpha: 0.14),
+              child: Icon(
+                isRejected
+                    ? Icons.cancel_outlined
+                    : Icons.verified_user_outlined,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: color,
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(message),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PatientIdentityCard extends StatelessWidget {
   final GuardianPatientDashboard dashboard;
-  final AsyncValue<String> qrTokenAsync;
+  final AsyncValue<String>? qrTokenAsync;
+  final bool canShowQr;
 
   const _PatientIdentityCard({
     required this.dashboard,
     required this.qrTokenAsync,
+    required this.canShowQr,
   });
 
   @override
   Widget build(BuildContext context) {
     final patient = dashboard.patient;
     final profile = dashboard.profile;
+
+    final patientName = profile?.fullName?.trim().isNotEmpty == true
+        ? profile!.fullName!.trim()
+        : patient.fullName;
 
     return Card(
       elevation: 2,
@@ -166,9 +227,7 @@ class _PatientIdentityCard extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              profile?.fullName?.trim().isNotEmpty == true
-                  ? profile!.fullName!
-                  : patient.fullName,
+              patientName,
               textAlign: TextAlign.center,
               style: AppTextStyles.heading2,
             ),
@@ -178,56 +237,108 @@ class _PatientIdentityCard extends StatelessWidget {
               style: AppTextStyles.bodySmall,
             ),
             const SizedBox(height: 20),
-            qrTokenAsync.when(
-              loading: () => const SizedBox(
-                height: 190,
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-              error: (error, _) => SizedBox(
-                height: 190,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.qr_code_2_outlined,
-                        size: 54,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'تعذر إنشاء رمز QR حالياً',
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              data: (token) => Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: QrImageView(
-                      data: token,
-                      size: 190,
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'يُستخدم هذا الرمز للوصول إلى المعلومات الصحية في حالات الطوارئ.',
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+            if (!canShowQr)
+              const _QrVerificationLocked()
+            else
+              _QrSection(qrTokenAsync: qrTokenAsync!),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _QrVerificationLocked extends StatelessWidget {
+  const _QrVerificationLocked();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 190),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: const Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.lock_outline_rounded,
+            size: 52,
+          ),
+          SizedBox(height: 12),
+          Text(
+            'رمز QR غير متاح حالياً',
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 6),
+          Text(
+            'يتطلب عرض الرمز اعتماد تحقق حساب ولي الأمر.',
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QrSection extends StatelessWidget {
+  final AsyncValue<String> qrTokenAsync;
+
+  const _QrSection({
+    required this.qrTokenAsync,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return qrTokenAsync.when(
+      loading: () => const SizedBox(
+        height: 190,
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (error, _) => const SizedBox(
+        height: 190,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.qr_code_2_outlined,
+                size: 54,
+                color: Colors.grey,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'تعذر إنشاء رمز QR حالياً',
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (token) => Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: QrImageView(
+              data: token,
+              size: 190,
+              backgroundColor: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'يُستخدم هذا الرمز للوصول إلى المعلومات الصحية في حالات الطوارئ.',
+            textAlign: TextAlign.center,
+          ),
+        ],
       ),
     );
   }
@@ -314,6 +425,11 @@ class _EmergencySummaryCard extends StatelessWidget {
     final hasEmergency = dashboard.emergency.count > 0;
     final color = hasEmergency ? Colors.red : Colors.green;
 
+    final subtitle = hasEmergency
+        ? 'عدد الحالات: ${dashboard.emergency.count}'
+            '${lastEvent?.createdAt != null ? '\nآخر حالة: ${lastEvent!.createdAt}' : ''}'
+        : 'لم يتم تسجيل أي حالة طوارئ للمريض';
+
     return Card(
       child: ListTile(
         leading: CircleAvatar(
@@ -326,12 +442,7 @@ class _EmergencySummaryCard extends StatelessWidget {
         title: Text(
           hasEmergency ? 'سجل الطوارئ' : 'لا توجد حالات طوارئ',
         ),
-        subtitle: Text(
-          hasEmergency
-              ? 'عدد الحالات: ${dashboard.emergency.count}'
-                  '${lastEvent?.createdAt != null ? '\nآخر حالة: ${lastEvent!.createdAt}' : ''}'
-              : 'لم يتم تسجيل أي حالة طوارئ للمريض',
-        ),
+        subtitle: Text(subtitle),
         trailing: const Icon(Icons.chevron_left_rounded),
         onTap: onPressed,
       ),
@@ -360,46 +471,6 @@ class _FilesSummaryCard extends StatelessWidget {
           dashboard.medicalFiles.count == 0
               ? 'لا توجد ملفات طبية حالياً'
               : '${dashboard.medicalFiles.count} ملف طبي',
-        ),
-        trailing: const Icon(Icons.chevron_left_rounded),
-        onTap: onPressed,
-      ),
-    );
-  }
-}
-
-class _ProfileStatusCard extends StatelessWidget {
-  final GuardianPatientDashboard dashboard;
-  final VoidCallback onPressed;
-
-  const _ProfileStatusCard({
-    required this.dashboard,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isComplete = dashboard.profile?.isProfileComplete ?? false;
-
-    return Card(
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: (isComplete ? Colors.green : Colors.orange)
-              .withValues(alpha: 0.12),
-          child: Icon(
-            isComplete
-                ? Icons.check_circle_outline_rounded
-                : Icons.warning_amber_rounded,
-            color: isComplete ? Colors.green : Colors.orange,
-          ),
-        ),
-        title: Text(
-          isComplete ? 'الملف الطبي مكتمل' : 'الملف الطبي غير مكتمل',
-        ),
-        subtitle: Text(
-          isComplete
-              ? 'يمكنك مراجعة بيانات المريض وتحديثها عند الحاجة'
-              : 'أكمل بيانات المريض الصحية المهمة',
         ),
         trailing: const Icon(Icons.chevron_left_rounded),
         onTap: onPressed,
@@ -536,7 +607,7 @@ class _LoadError extends StatelessWidget {
 }
 
 String _genderLabel(String? value) {
-  switch (value?.toLowerCase()) {
+  switch (value?.trim().toLowerCase()) {
     case 'male':
       return 'ذكر';
     case 'female':

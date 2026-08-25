@@ -49,7 +49,8 @@ class PatientQrScreen extends ConsumerWidget {
 final validityText = remainingMinutes > 0
     ? 'صالح لمدة $remainingMinutes دقيقة'
     : 'انتهت صلاحية هذا الكود، يرجى التحديث.';
-
+debugPrint('QR TOKEN SENT TO WIDGET: ${qrToken.token}');
+debugPrint('QR EXPIRES AT: ${qrToken.expiresAt.toIso8601String()}');
             final dashboardAsync =
                 ref.watch(patientQrDashboardProvider(qrToken.token));
 
@@ -145,6 +146,7 @@ const SizedBox(height: 24),
                           ),
                         ],
                       ),
+                      
                       child: QrImageView(
                         data: qrToken.token,
                         version: QrVersions.auto,

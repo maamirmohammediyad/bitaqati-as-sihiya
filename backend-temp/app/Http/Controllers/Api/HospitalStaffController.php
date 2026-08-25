@@ -14,6 +14,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Requests\Hospital\UpdateHospitalStaffRequest;
+use App\Mail\HospitalStaffCredentialsMail;
+use Illuminate\Support\Facades\Mail;
 class HospitalStaffController extends Controller
 {
     public function index(Request $request): JsonResponse
@@ -79,7 +81,14 @@ class HospitalStaffController extends Controller
         $staffMember->load([
             'user:id,name,email,employee_code,phone,is_active',
         ]);
-
+Mail::to($staffMember->user->email)->send(
+    new HospitalStaffCredentialsMail(
+        name: $staffMember->user->name,
+        employeeCode: $staffMember->user->employee_code,
+        password: $request->input('password'),
+        role: $staffMember->role->value,
+    )
+);
         return response()->json([
             'message' => 'تمت إضافة موظف المستشفى بنجاح.',
             'data' => $this->staffData($staffMember),

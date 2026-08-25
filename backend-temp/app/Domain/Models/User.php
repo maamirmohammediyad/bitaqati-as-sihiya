@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 namespace App\Domain\Models;
-
+use App\Domain\Models\HospitalPatientScanNote;
 use App\Domain\Enums\UserRole;
 use App\Http\Middleware\CheckRole;
 use Database\Factories\UserFactory;
@@ -18,6 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
 use App\Domain\Models\MedicalFile;
 use App\Domain\Enums\HospitalUserRole;
 use App\Domain\Models\HospitalUser;
+use App\Notifications\CustomResetPasswordNotification;
 class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, HasUuids, Notifiable;
@@ -172,5 +173,70 @@ public function hospitals(): BelongsToMany
    public function hospitalUsers(): HasMany
 {
     return $this->hasMany(HospitalUser::class, 'user_id');
+}
+public function sendPasswordResetNotification($token): void
+{
+    $this->notify(
+        new CustomResetPasswordNotification($token)
+    );
+}
+
+public function isHealthWorker(): bool
+{
+    return $this->role === UserRole::HealthWorker;
+}
+
+public function isPatient(): bool
+{
+    return $this->role === UserRole::Patient;
+}
+
+public function isGuardian(): bool
+{
+    return $this->role === UserRole::Guardian;
+}
+public function hospitalScanNotes(): HasMany
+{
+    return $this->hasMany(
+        HospitalPatientScanNote::class,
+        'created_by_user_id',
+    );
+}
+
+public function receivedHospitalScanNotes(): HasMany
+{
+    return $this->hasMany(
+        HospitalPatientScanNote::class,
+        'patient_id',
+    );
+}
+
+public function prescribedMedications(): HasMany
+{
+    return $this->hasMany(
+        HospitalMedication::class,
+        'created_by'
+    );
+}
+
+public function patientMedications(): HasMany
+{
+    return $this->hasMany(
+        PatientMedication::class,
+        'patient_id'
+    );
+}
+
+public function addedPatientMedications(): HasMany
+{
+    return $this->hasMany(
+        PatientMedication::class,
+        'added_by'
+    );
+}
+
+public function accountVerificationDocument(): HasOne
+{
+    return $this->hasOne(AccountVerificationDocument::class);
 }
 }

@@ -24,7 +24,7 @@ class CompleteProfileRequest extends FormRequest
             'weight_kg' => ['nullable', 'numeric', 'min:1', 'max:500'],
             'allergies' => ['nullable', 'string', 'max:2000'],
             'chronic_diseases' => ['nullable', 'string', 'max:2000'],
-            'medications' => ['nullable', 'string', 'max:2000'],
+            'medications' => ['nullable', 'array', 'max:100'],'medications.*.id' => ['nullable', 'uuid'],'medications.*.name' => ['required_with:medications', 'string', 'max:255'],'medications.*.dosage' => ['nullable', 'string', 'max:255'],'medications.*.frequency' => ['nullable', 'string', 'max:255'],'medications.*.notes' => ['nullable', 'string', 'max:1000'],
             'emergency_notes' => ['nullable', 'string', 'max:2000'],
             'address' => ['nullable', 'string', 'max:500'],
             'city' => ['nullable', 'string', 'max:255'],

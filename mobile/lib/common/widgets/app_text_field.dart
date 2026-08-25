@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_text_styles.dart';
 
@@ -24,7 +25,7 @@ class AppTextField extends StatefulWidget {
   final FocusNode? focusNode;
   final TextCapitalization textCapitalization;
   final AutovalidateMode? autovalidateMode;
-
+  final List<TextInputFormatter>? inputFormatters;
   const AppTextField({
     super.key,
     required this.label,
@@ -48,6 +49,7 @@ class AppTextField extends StatefulWidget {
     this.focusNode,
     this.textCapitalization = TextCapitalization.none,
     this.autovalidateMode,
+    this.inputFormatters,
   });
 
   @override

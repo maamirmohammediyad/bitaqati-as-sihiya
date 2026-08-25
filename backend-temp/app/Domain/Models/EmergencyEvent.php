@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use App\Domain\Models\Hospital;
+use Illuminate\Database\Eloquent\Builder;
 class EmergencyEvent extends Model
 {
     use HasUuids;
@@ -73,6 +74,72 @@ public function notes(): HasMany
     return $this->hasMany(
         EmergencyEventNote::class,
         'emergency_event_id',
+    );
+}
+
+public function scopeVisibleToHospital(
+    Builder $query,
+    Hospital $hospital,
+): Builder {
+    if ($hospital->latitude === null || $hospital->longitude === null) {
+        return $query->whereRaw('1 = 0');
+    }
+
+    $radiusKm = (float) config(
+        'services.hospital_emergency_radius_km',
+        20,
+    );
+
+    $distanceSql = '
+        6371 * acos(
+            least(
+                1.0,
+                greatest(
+                    -1.0,
+                    cos(radians(?))
+                    * cos(radians(latitude))
+                    * cos(radians(longitude) - radians(?))
+                    + sin(radians(?))
+                    * sin(radians(latitude))
+                )
+            )
+        )
+    ';
+
+    $bindings = [
+        $hospital->latitude,
+        $hospital->longitude,
+        $hospital->latitude,
+    ];
+
+    return $query
+        ->select('emergency_events.*')
+        ->selectRaw(
+    "round(({$distanceSql})::numeric, 2) as distance_km",
+    $bindings,
+)
+        ->whereNotNull('latitude')
+        ->whereNotNull('longitude')
+        ->whereRaw("{$distanceSql} <= ?", [
+            ...$bindings,
+            $radiusKm,
+        ]);
+}
+
+public function qrLastScannedBy(): BelongsTo
+{
+    return $this->belongsTo(
+        User::class,
+        'qr_last_scanned_by_user_id'
+    );
+}
+
+public function hospitalQrScans(): HasMany
+{
+    return $this->hasMany(
+        HospitalPatientQrScan::class,
+        'patient_id',
+        'user_id'
     );
 }
 }

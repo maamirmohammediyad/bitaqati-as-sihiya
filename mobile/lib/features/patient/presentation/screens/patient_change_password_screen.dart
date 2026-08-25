@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:go_router/go_router.dart';
+import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bitaqati_as_sihiya/core/theme/app_colors.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/account_provider.dart';
 
@@ -58,7 +59,11 @@ class _PatientChangePasswordScreenState
         ),
       );
 
-      Navigator.of(context).pop();
+      await ref.read(authProvider.notifier).logout();
+
+if (!mounted) return;
+
+context.go('/login');
     } on DioException catch (error) {
       if (!mounted) return;
 

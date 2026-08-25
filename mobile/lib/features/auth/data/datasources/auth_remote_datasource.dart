@@ -21,7 +21,7 @@ class AuthRemoteDataSource {
     try {
       final response = await _apiClient.post(
         ApiConstants.login,
-        data: request.toJson(),
+        data: request.toRequestJson(),
       );
       return LoginResponse.fromJson(response.data as Map<String, dynamic>);
     } on DioException {

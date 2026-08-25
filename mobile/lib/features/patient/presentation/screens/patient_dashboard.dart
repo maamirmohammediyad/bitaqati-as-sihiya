@@ -24,44 +24,31 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
     super.initState();
 
     Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _showWelcome = false;
-        });
-      }
+      if (!mounted) return;
+
+      setState(() {
+        _showWelcome = false;
+      });
     });
   }
 
   void _handleEmergencyRedirect(String? status) {
-    if (_hasHandledEmergencyRedirect || !mounted) {
-      return;
-    }
+    if (_hasHandledEmergencyRedirect || !mounted) return;
 
-    if (status != 'active' && status != 'checked_in') {
-      return;
-    }
+    if (status != 'active') return;
 
     _hasHandledEmergencyRedirect = true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-
-      if (status == 'active') {
-        context.go('/sos');
-      } else if (status == 'checked_in') {
-        context.go('/emergency/checked-in');
-      }
+      if (!mounted) return;
+      context.go('/sos');
     });
   }
 
   Future<void> _logout() async {
     await ref.read(authProvider.notifier).logout();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     context.go('/login');
   }
@@ -97,18 +84,18 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
 
     final isProfileComplete = user.isProfileComplete;
 
+    final verificationStatus = user.verificationStatus.trim().toLowerCase();
+
+    final isVerified = verificationStatus == 'approved';
+
+    // البطاقة ورمز QR لا يظهران إلا بعد إكمال الملف واعتماد التوثيق.
+    final canUseHealthCard = isProfileComplete && isVerified;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(localizations.home),
         centerTitle: true,
         actions: [
-          IconButton(
-            tooltip: 'تغيير اللغة',
-            icon: const Icon(Icons.language_rounded),
-            onPressed: () {
-              ref.read(localeProvider.notifier).toggleLanguage();
-            },
-          ),
           IconButton(
             tooltip: 'تسجيل الخروج',
             icon: const Icon(Icons.logout_rounded),
@@ -147,6 +134,12 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
                 const SizedBox(height: 16),
               ],
 
+              // يظهر دائمًا حتى يضيفه الولي، سواء كان الملف مكتملًا أو لا.
+              _PatientCodeBanner(
+                patientCode: user.patientCode,
+              ),
+              const SizedBox(height: 16),
+
               _SosButton(
                 onPressed: () {
                   context.go('/sos');
@@ -168,30 +161,31 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
                 crossAxisSpacing: 14,
                 childAspectRatio: 1.05,
                 children: [
-                  _DashboardGridItem(
-                    icon: Icons.health_and_safety_outlined,
-                    label: 'بطاقتي الصحية',
-                    description: isProfileComplete
-                        ? 'عرض البطاقة الصحية'
-                        : 'أكمل الملف لتفعيلها',
-                    color: AppColors.primary,
-                    isEnabled: isProfileComplete,
-                    onTap: () {
-                      context.go('/patient/health-card');
-                    },
-                  ),
-                  _DashboardGridItem(
-                    icon: Icons.qr_code_2_rounded,
-                    label: localizations.qrCode,
-                    description: isProfileComplete
-                        ? 'عرض رمز الاستجابة السريع'
-                        : 'أكمل الملف لتفعيله',
-                    color: AppColors.secondary,
-                    isEnabled: isProfileComplete,
-                    onTap: () {
-                      context.go('/patient/qr');
-                    },
-                  ),
+                  // يظهران فقط بعد اكتمال الملف والموافقة على وثيقة الهوية.
+                  if (canUseHealthCard)
+                    _DashboardGridItem(
+                      icon: Icons.health_and_safety_outlined,
+                      label: 'بطاقتي الصحية',
+                      description: 'عرض البطاقة الصحية',
+                      color: AppColors.primary,
+                      isEnabled: true,
+                      onTap: () {
+                        context.go('/patient/health-card');
+                      },
+                    ),
+
+                  if (canUseHealthCard)
+                    _DashboardGridItem(
+                      icon: Icons.qr_code_2_rounded,
+                      label: localizations.qrCode,
+                      description: 'عرض رمز الاستجابة السريع',
+                      color: AppColors.secondary,
+                      isEnabled: true,
+                      onTap: () {
+                        context.go('/patient/qr');
+                      },
+                    ),
+
                   _DashboardGridItem(
                     icon: Icons.folder_copy_outlined,
                     label: localizations.medicalRecord,
@@ -202,6 +196,7 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
                       context.go('/patient/medical-record');
                     },
                   ),
+
                   _DashboardGridItem(
                     icon: Icons.description_outlined,
                     label: 'ملفاتي الطبية',
@@ -212,16 +207,8 @@ class _PatientDashboardState extends ConsumerState<PatientDashboard> {
                       context.push('/patient/files');
                     },
                   ),
-                  _DashboardGridItem(
-                    icon: Icons.local_hospital_outlined,
-                    label: localizations.hospitals,
-                    description: 'المستشفيات القريبة منك',
-                    color: const Color(0xFF4E7DDB),
-                    isEnabled: true,
-                    onTap: () {
-                      context.go('/patient/hospitals');
-                    },
-                  ),
+
+
                   _DashboardGridItem(
                     icon: Icons.history_rounded,
                     label: 'سجل الطوارئ',
@@ -373,6 +360,76 @@ class _CompleteProfileBanner extends StatelessWidget {
   }
 }
 
+class _PatientCodeBanner extends StatelessWidget {
+  final String? patientCode;
+
+  const _PatientCodeBanner({
+    required this.patientCode,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final code = patientCode?.trim();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.22),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.badge_outlined,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'كود المريض',
+                  style: AppTextStyles.bodyLarge,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  code == null || code.isEmpty ? 'غير متوفر حاليًا' : code,
+                  textDirection: TextDirection.ltr,
+                  style: AppTextStyles.heading3.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'شارك هذا الكود مع ولي أمرك لإضافتك إلى حسابه.',
+                  style: AppTextStyles.caption.copyWith(
+                    color: AppColors.grey700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SosButton extends StatelessWidget {
   final VoidCallback onPressed;
 
@@ -465,7 +522,7 @@ class _DashboardGridItem extends StatelessWidget {
       enabled: isEnabled,
       label: isEnabled
           ? label
-          : '$label غير متاح حتى يتم إكمال الملف الصحي',
+          : '$label غير متاح حاليًا',
       child: Material(
         color: cardColor,
         borderRadius: BorderRadius.circular(20),

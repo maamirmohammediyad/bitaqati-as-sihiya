@@ -32,9 +32,6 @@ class ApiClient {
   LogInterceptor(
     requestBody: true,
     responseBody: true,
-    logPrint: (object) {
-      print(object); // مؤقتًا اطبع اللوج في الـ console
-    },
   ),
 ]);
   }
@@ -70,7 +67,24 @@ class ApiClient {
       cancelToken: cancelToken,
     );
   }
-
+  Future<Response<T>> postFormData<T>(
+  String path, {
+  required FormData data,
+  Map<String, dynamic>? queryParameters,
+  Options? options,
+  CancelToken? cancelToken,
+}) {
+  return _dio.post<T>(
+    path,
+    data: data,
+    queryParameters: queryParameters,
+    options: options ??
+        Options(
+          contentType: Headers.multipartFormDataContentType,
+        ),
+    cancelToken: cancelToken,
+  );
+}
   Future<Response<T>> put<T>(
     String path, {
     dynamic data,
@@ -157,10 +171,7 @@ class _ErrorInterceptor extends Interceptor {
     final statusCode = err.response?.statusCode;
     final rawData = err.response?.data;
 
-    print('API ERROR TYPE: ${err.type}');
-    print('API ERROR STATUS: $statusCode');
-    print('API ERROR DATA: $rawData');
-
+  
     switch (err.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:
@@ -248,8 +259,6 @@ class _ErrorInterceptor extends Interceptor {
         break;
 
       default:
-        // هنا أخطاء مثل FormatException, SocketException, إلخ
-        print('DIO UNKNOWN ERROR: type=${err.type}, error=${err.error}');
         handler.reject(
           DioException(
             requestOptions: err.requestOptions,

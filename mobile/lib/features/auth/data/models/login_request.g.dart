@@ -8,14 +8,14 @@ part of 'login_request.dart';
 
 _$LoginRequestImpl _$$LoginRequestImplFromJson(Map<String, dynamic> json) =>
     _$LoginRequestImpl(
-      nationalId: json['national_id'] as String,
+      identifier: json['identifier'] as String,
       password: json['password'] as String,
       role: json['role'] as String,
     );
 
 Map<String, dynamic> _$$LoginRequestImplToJson(_$LoginRequestImpl instance) =>
     <String, dynamic>{
-      'national_id': instance.nationalId,
+      'identifier': instance.identifier,
       'password': instance.password,
       'role': instance.role,
     };

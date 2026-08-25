@@ -215,40 +215,54 @@ class _SosScreenState extends ConsumerState<SosScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final emergencyAsync = ref.watch(currentEmergencyProvider);
+@override
+Widget build(BuildContext context) {
+  final emergencyAsync = ref.watch(currentEmergencyProvider);
 
-    return emergencyAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
-      error: (error, _) => _ErrorState(
-        error: error.toString(),
-        onRetry: _refreshEmergency,
-      ),
-      data: (event) {
-        if (event == null) {
-          return _IdleSosView(
-            isLoading: _isLoading,
-            onTrigger: _confirmAndTriggerSos,
-          );
-        }
+  return emergencyAsync.when(
+    loading: () => const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
+    ),
+    error: (error, _) => _ErrorState(
+      error: error.toString(),
+      onRetry: _refreshEmergency,
+    ),
+    data: (event) {
+      if (event == null) {
+        return _IdleSosView(
+          isLoading: _isLoading,
+          onTrigger: _confirmAndTriggerSos,
+        );
+      }
 
-        if (event.status == 'checked_in') {
-          return _CheckedInView(
-            hospitalName: event.hospitalName,
-          );
-        }
+      // هذه هي الحالات التي يجب أن تعرض QR.
+      // الـAPI عندك يستخدم "checkedin" بدون underscore.
+      const qrStatuses = {
+        'pending',
+        'active',
+        'sent',
+        'accepted',
+        'in_progress',
+        'checkedin',
+        'checked_in',
+      };
 
+      if (qrStatuses.contains(event.status.toLowerCase())) {
         return _ActiveSosView(
           eventId: event.id,
           isLoading: _isLoading,
           onCancel: _cancelSos,
         );
-      },
-    );
-  }
+      }
+
+      // الحالات المنتهية فقط تعيد المستخدم إلى واجهة إنشاء SOS.
+      return _IdleSosView(
+        isLoading: _isLoading,
+        onTrigger: _confirmAndTriggerSos,
+      );
+    },
+  );
+}
 }
 
 class _IdleSosView extends StatelessWidget {

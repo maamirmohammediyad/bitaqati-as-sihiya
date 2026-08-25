@@ -22,6 +22,8 @@ use App\Http\Resources\EmergencyEventResource;
 use App\Domain\Models\EmergencyEvent;
 use App\Domain\Models\PatientQrToken;
 use App\Domain\Models\Hospital;
+use App\Domain\Models\AccountVerificationDocument;
+use Illuminate\Support\Facades\Storage;
 
 class PatientController extends Controller
 {
@@ -390,6 +392,95 @@ public function updateMyEmail(Request $request): JsonResponse
     return response()->json([
         'message' => 'تم حفظ البريد الإلكتروني بنجاح.',
         'data' => new UserResource($user->fresh()),
+    ]);
+}
+public function uploadAccountVerificationDocument(Request $request): JsonResponse
+{
+    /** @var User $user */
+    $user = $request->user();
+
+    if (!in_array($user->role, [UserRole::Patient, UserRole::Guardian], true)) {
+        abort(403, 'رفع وثيقة التحقق متاح للمريض أو ولي الأمر فقط.');
+    }
+
+    $validated = $request->validate([
+        'document' => [
+            'required',
+            'file',
+            'mimetypes:application/pdf,image/jpeg,image/png',
+            'max:5120',
+        ],
+    ], [
+        'document.required' => 'يرجى اختيار وثيقة.',
+        'document.mimetypes' => 'يسمح فقط بملفات PDF أو JPG أو PNG.',
+        'document.max' => 'الحد الأقصى لحجم الوثيقة هو 5 ميغابايت.',
+    ]);
+
+    $uploadedFile = $validated['document'];
+
+    $existingDocument = $user->accountVerificationDocument;
+
+    if ($existingDocument?->storage_path) {
+        Storage::disk('private')->delete($existingDocument->storage_path);
+    }
+
+    $path = $uploadedFile->store(
+        "account_verification_documents/{$user->id}",
+        'private',
+    );
+
+    $document = AccountVerificationDocument::updateOrCreate(
+        ['user_id' => $user->id],
+        [
+            'original_name' => $uploadedFile->getClientOriginalName(),
+            'storage_path' => $path,
+            'mime_type' => $uploadedFile->getMimeType(),
+            'size_bytes' => $uploadedFile->getSize(),
+            'submitted_at' => now(),
+            'reviewed_at' => null,
+            'reviewed_by' => null,
+            'status' => 'pending',
+            'rejection_reason' => null,
+        ],
+    );
+
+    return response()->json([
+        'message' => 'تم رفع وثيقة التحقق بنجاح. سيجري مراجعتها من الإدارة.',
+        'data' => [
+            'id' => (string) $document->id,
+            'original_name' => $document->original_name,
+            'mime_type' => $document->mime_type,
+            'size_bytes' => $document->size_bytes,
+            'submitted_at' => $document->submitted_at?->toIso8601String(),
+            'status' => 'pending',
+        ],
+    ], 201);
+}
+
+
+public function show(Request $request): JsonResponse
+{
+    $document = AccountVerificationDocument::query()
+        ->where('user_id', $request->user()->id)
+        ->latest('submitted_at')
+        ->first();
+
+    if ($document === null) {
+        return response()->json([
+            'data' => null,
+        ]);
+    }
+
+    return response()->json([
+        'data' => [
+            'id' => $document->id,
+            'original_name' => $document->original_name,
+            'mime_type' => $document->mime_type,
+            'size_bytes' => $document->size_bytes,
+            'submitted_at' => $document->submitted_at?->toISOString(),
+            'status' => $document->status ?? 'pending',
+            'rejection_reason' => $document->rejection_reason,
+        ],
     ]);
 }
 }

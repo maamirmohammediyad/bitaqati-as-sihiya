@@ -29,6 +29,8 @@ class MedicalFile extends Model
         'mime_type',
         'size_bytes',
         'file_type',
+        'hospital_id',
+        'uploaded_by',
         'description',
     ];
 
@@ -38,6 +40,8 @@ class MedicalFile extends Model
             'id' => 'string',
             'user_id' => 'string',
             'size_bytes' => 'integer',
+            'hospital_id' => 'string',
+            'uploaded_by' => 'string',
             'file_type' => FileType::class,
         ];
     }
@@ -46,4 +50,13 @@ class MedicalFile extends Model
     {
         return $this->belongsTo(User::class);
     }
+    public function hospital(): BelongsTo
+{
+    return $this->belongsTo(Hospital::class);
+}
+
+public function uploader(): BelongsTo
+{
+    return $this->belongsTo(User::class, 'uploaded_by');
+}
 }

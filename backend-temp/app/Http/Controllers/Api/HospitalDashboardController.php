@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Domain\Models\EmergencyEvent;
+use App\Domain\Models\Hospital;
 use App\Domain\Models\HospitalUser;
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -18,11 +20,17 @@ class HospitalDashboardController extends Controller
         $hospitalUser = $request->attributes->get('hospital_user');
 
         $hospital = $hospitalUser->hospital;
-
         $today = today();
 
-        $activeEmergencies = EmergencyEvent::query()
-            ->where('status', 'active')
+        // بلاغات طوارئ نشطة ولم تستقبلها أي مؤسسة حتى الآن.
+        $activeEmergencies = $this->visibleEmergencyQuery($hospital)
+    ->where('status', 'active')
+    ->count();
+
+        // الحالات التي استقبلها هذا المستشفى وما زالت قيد المتابعة.
+        $hospitalActiveEmergencies = EmergencyEvent::query()
+            ->where('checked_in_hospital_id', $hospital->id)
+            ->where('status', 'checked_in')
             ->count();
 
         $checkedInToday = EmergencyEvent::query()
@@ -41,18 +49,11 @@ class HospitalDashboardController extends Controller
             ->where('is_active', true)
             ->count();
 
-        $recentEmergencies = EmergencyEvent::query()
-            ->with([
-                'user:id,name,phone,patient_code',
-            ])
-            ->where(function ($query) use ($hospital): void {
-                $query
-                    ->where('checked_in_hospital_id', $hospital->id)
-                    ->orWhere('status', 'active');
-            })
-            ->latest('created_at')
-            ->limit(10)
-            ->get()
+        $recentEmergencies = $this->visibleEmergencyQuery($hospital)
+    ->with('user:id,name,phone,patient_code')
+    ->latest('created_at')
+    ->limit(10)
+    ->get()
             ->map(function (EmergencyEvent $event): array {
                 return [
                     'id' => $event->id,
@@ -90,6 +91,7 @@ class HospitalDashboardController extends Controller
                 ],
                 'statistics' => [
                     'active_emergencies' => $activeEmergencies,
+                    'hospital_active_emergencies' => $hospitalActiveEmergencies,
                     'checked_in_today' => $checkedInToday,
                     'resolved_today' => $resolvedToday,
                     'active_staff_count' => $staffCount,
@@ -98,4 +100,45 @@ class HospitalDashboardController extends Controller
             ],
         ]);
     }
+
+    private function visibleEmergencyQuery(Hospital $hospital): Builder
+{
+    $radiusKm = (float) env('HOSPITAL_EMERGENCY_RADIUS_KM', 20);
+
+    return EmergencyEvent::query()
+        ->where(function (Builder $query) use ($hospital, $radiusKm): void {
+            // كل الحالات التي استقبلها المستشفى.
+            $query->where('checked_in_hospital_id', $hospital->id);
+
+            // البلاغات النشطة في النطاق الجغرافي فقط.
+            if ($hospital->latitude !== null && $hospital->longitude !== null) {
+                $query->orWhereRaw(
+                    '
+                    status = ?
+                    AND latitude IS NOT NULL
+                    AND longitude IS NOT NULL
+                    AND (
+                        6371 * acos(
+                            least(
+                                1,
+                                cos(radians(?))
+                                * cos(radians(latitude))
+                                * cos(radians(longitude) - radians(?))
+                                + sin(radians(?))
+                                * sin(radians(latitude))
+                            )
+                        )
+                    ) <= ?
+                    ',
+                    [
+                        'active',
+                        (float) $hospital->latitude,
+                        (float) $hospital->longitude,
+                        (float) $hospital->latitude,
+                        $radiusKm,
+                    ]
+                );
+            }
+        });
+}
 }

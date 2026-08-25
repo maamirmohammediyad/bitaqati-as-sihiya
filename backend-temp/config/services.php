@@ -13,7 +13,7 @@ return [
     | a conventional file to locate the various service credentials.
     |
     */
-
+     
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
@@ -37,5 +37,8 @@ return [
     'fcm' => [
         'server_key' => env('FCM_SERVER_KEY'),
     ],
-
+    'hospital_emergency_radius_km' => env(
+    'HOSPITAL_EMERGENCY_RADIUS_KM',
+    20,
+),
 ];

@@ -14,7 +14,7 @@ use App\Domain\Models\EmergencyEvent;
 use App\Domain\Models\MedicalFile;
 use App\Domain\Models\PatientQrToken;
 use App\Domain\Models\Hospital;
-
+use App\Domain\Models\HospitalPatientQrScan;
 use App\Http\Resources\UserResource;
 use App\Http\Resources\EmergencyEventResource;
 use App\Http\Resources\MedicalFileResource;
@@ -24,8 +24,10 @@ class PatientQrController extends Controller
     // إصدار / تجديد توكن QR للمريض الحالي
     public function issue(Request $request): JsonResponse
     {
+      $this->ensureVerifiedAccount($request);  
    /** @var User $user */
     $user = $request->user();
+    
 
     // لم نعد نتحقق من role، لأن شاشة QR موجودة فقط في واجهة المريض
 
@@ -52,8 +54,9 @@ class PatientQrController extends Controller
     // قراءة بيانات المريض من توكن QR
   public function show(string $token): JsonResponse
 {
+     $this->ensureVerifiedAccount($request);
     $hashed = hash('sha256', $token);
-
+    
     /** @var PatientQrToken|null $qr */
     $qr = PatientQrToken::with('user')
         ->where('token', $hashed)
@@ -154,6 +157,8 @@ class PatientQrController extends Controller
             }),
         ],
     ]);
+
+
 }
 public function issueForGuardian(Request $request, string $id): JsonResponse
 {
@@ -188,5 +193,73 @@ public function issueForGuardian(Request $request, string $id): JsonResponse
             'expires_at' => $qr->expires_at->toIso8601String(),
         ],
     ]);
+}
+public function showForHospitalStaff(
+    Request $request,
+    string $token,
+): JsonResponse {
+    $hospitalId = $request->attributes->get('hospital_id');
+
+    if ($hospitalId === null) {
+        return response()->json([
+            'message' => 'تعذر تحديد المستشفى.',
+        ], 403);
+    }
+
+    $qr = PatientQrToken::query()
+    ->with('user.patientProfile')
+    ->where('token', hash('sha256', $token))
+    ->where('expires_at', '>', now())
+    ->whereNull('used_at')
+    ->first();
+
+    if ($qr === null || ! $qr->isValid()) {
+        return response()->json([
+            'message' => 'رمز QR غير صالح أو منتهي الصلاحية.',
+        ], 404);
+    }
+
+    $patient = $qr->user;
+
+    $scan = HospitalPatientQrScan::query()->create([
+        'hospital_id' => $hospitalId,
+        'patient_id' => $patient->id,
+        'scanned_by_user_id' => $request->user()->id,
+        'patient_qr_token_id' => $qr->id,
+        'scanned_at' => now(),
+    ]);
+
+    $qr->update([
+        'used_at' => now(),
+    ]);
+
+    return response()->json([
+        'message' => 'تم تسجيل مسح رمز QR بنجاح.',
+        'data' => [
+            'scan_id' => (string) $scan->id,
+            'patient' => [
+                'id' => (string) $patient->id,
+                'name' => $patient->patientProfile?->full_name ?? $patient->name,
+                'patient_code' => $patient->patient_code,
+                'phone' => $patient->phone,
+                'blood_group' => $patient->patientProfile?->blood_group?->value,
+            ],
+            'scanned_at' => $scan->scanned_at?->toISOString(),
+        ],
+    ], 201);
+}
+
+    private function ensureVerifiedAccount(Request $request): void
+{
+    $user = $request->user()->load('accountVerificationDocument');
+
+    $status = $user->accountVerificationDocument?->status ?? 'unsubmitted';
+
+    if ($status !== 'approved') {
+        abort(response()->json([
+            'message' => 'لا يمكن استخدام البطاقة الصحية أو رمز QR قبل توثيق الحساب.',
+            'verification_status' => $status,
+        ], 403));
+    }
 }
 }

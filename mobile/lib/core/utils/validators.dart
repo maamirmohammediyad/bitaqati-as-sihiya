@@ -130,4 +130,25 @@ static String? algerianPhone(String? value) {
     }
     return null;
   }
+
+  static String? latinName(String? value, String fieldName) {
+  final name = value?.trim() ?? '';
+
+  if (name.isEmpty) {
+    return '$fieldName مطلوب';
+  }
+
+  // حروف لاتينية فقط، مع السماح بمسافة أو شرطة أو apostrophe.
+  final latinNamePattern = RegExp(r"^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$");
+
+  if (!latinNamePattern.hasMatch(name)) {
+    return '$fieldName يجب أن يحتوي على حروف لاتينية فقط';
+  }
+
+  if (name.length < 2) {
+    return '$fieldName يجب أن يكون حرفين على الأقل';
+  }
+
+  return null;
+}
 }

@@ -81,9 +81,14 @@ public function login(LoginRequest $request): JsonResponse
     /** @var User $user */
     $user = $result['user'];
 
+    $user->load([
+    'patientProfile',
+    'accountVerificationDocument',
+    ]);
+    
     if ($user->role->value !== $requestedRole) {
         return response()->json([
-            'message' => 'نوع الحساب لا يطابق طريقة تسجيل الدخول.',
+            'message' =>'بيانات الدخول غير صحيحة.',
         ], 403);
     }
 

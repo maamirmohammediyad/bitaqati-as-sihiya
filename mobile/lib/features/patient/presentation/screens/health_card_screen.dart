@@ -42,7 +42,6 @@ class _HealthCardScreenState extends ConsumerState<HealthCardScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
-    final qrTokenAsync = ref.watch(patientQrTokenProvider);
 
     if (user == null) {
       return const Scaffold(
@@ -51,7 +50,18 @@ class _HealthCardScreenState extends ConsumerState<HealthCardScreen> {
         ),
       );
     }
+    final verificationStatus =
+    user.verificationStatus.trim().toLowerCase();
 
+final isVerified = verificationStatus == 'approved';
+
+if (!isVerified) {
+  return _HealthCardVerificationRequiredScreen(
+    verificationStatus: verificationStatus,
+    isProfileComplete: user.isProfileComplete,
+  );
+}
+final qrTokenAsync = ref.watch(patientQrTokenProvider);
     final nationalId = user.nationalId.trim();
 
     final displayedNationalId = _showNationalId
@@ -131,11 +141,11 @@ class _HealthCardScreenState extends ConsumerState<HealthCardScreen> {
                   ),
                   const Divider(height: 1),
                   const _CardInfoTile(
-                    icon: Icons.verified_user_outlined,
-                    title: 'حالة البطاقة',
-                    value: 'نشطة',
-                    valueColor: AppColors.success,
-                  ),
+  icon: Icons.verified_user_outlined,
+  title: 'حالة البطاقة',
+  value: 'نشطة',
+  valueColor: AppColors.success,
+),
                 ],
               ),
             ),
@@ -224,7 +234,126 @@ Widget _buildHealthCard({
   );
 }
 }
+class _HealthCardVerificationRequiredScreen extends StatelessWidget {
+  final String verificationStatus;
+  final bool isProfileComplete;
 
+  const _HealthCardVerificationRequiredScreen({
+    required this.verificationStatus,
+    required this.isProfileComplete,
+  });
+
+  String get _title {
+    if (!isProfileComplete) {
+      return 'أكمل معلوماتك الصحية';
+    }
+
+    switch (verificationStatus) {
+      case 'pending':
+        return 'حسابك قيد المراجعة';
+      case 'rejected':
+        return 'تعذر توثيق حسابك';
+      case 'unsubmitted':
+        return 'وثّق حسابك لتفعيل البطاقة';
+      default:
+        return 'البطاقة الصحية غير متاحة';
+    }
+  }
+
+  String get _message {
+    // الأولوية لإكمال الملف الشخصي.
+    if (!isProfileComplete) {
+      return 'يرجى إكمال معلوماتك الصحية أولًا قبل إرسال وثيقة إثبات الهوية.';
+    }
+
+    switch (verificationStatus) {
+      case 'pending':
+        return 'تم استلام وثيقة الإثبات، وحسابك الآن قيد المراجعة.';
+      case 'rejected':
+        return 'تم رفض وثيقة الإثبات. انتقل إلى صفحة الحساب لإرسال وثيقة جديدة.';
+      case 'unsubmitted':
+        return 'ملفك الصحي مكتمل، لكنك لم ترسل وثيقة إثبات الهوية بعد.';
+      default:
+        return 'لا يمكن استخدام البطاقة الصحية قبل توثيق الحساب.';
+    }
+  }
+
+  String get _buttonText {
+    return isProfileComplete
+        ? 'الذهاب إلى الحساب'
+        : 'إكمال المعلومات';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('البطاقة الصحية'),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  color: AppColors.grey100,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Icon(
+                  verificationStatus == 'rejected' && isProfileComplete
+                      ? Icons.error_outline_rounded
+                      : Icons.lock_outline_rounded,
+                  size: 42,
+                  color: verificationStatus == 'rejected' && isProfileComplete
+                      ? AppColors.error
+                      : AppColors.grey500,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                _title,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.heading3,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _message,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.grey700,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (!isProfileComplete) {
+                      context.go('/patient/complete-profile');
+                    } else {
+                      context.go('/patient/account');
+                    }
+                  },
+                  child: Text(_buttonText),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => context.go('/patient/home'),
+                child: const Text('العودة للرئيسية'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 class _QrUnavailableBanner extends StatelessWidget {
   final VoidCallback onRetry;
 
@@ -287,18 +416,19 @@ class _CardInfoTile extends StatelessWidget {
         color: AppColors.primary,
       ),
       title: Text(title),
-      trailing: Flexible(
-        child: Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.end,
-          style: AppTextStyles.bodyMedium.copyWith(
-            color: valueColor,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+trailing: SizedBox(
+  width: 110,
+  child: Text(
+    value,
+    maxLines: 1,
+    overflow: TextOverflow.ellipsis,
+    textAlign: TextAlign.end,
+    style: AppTextStyles.bodyMedium.copyWith(
+      color: valueColor,
+      fontWeight: FontWeight.w700,
+    ),
+  ),
+),
     );
   }
 }

@@ -44,10 +44,10 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final response = await _remoteDataSource.login(
         LoginRequest(
-          nationalId: nationalId,
-          password: password,
-          role: role,
-        ),
+  identifier: nationalId,
+  password: password,
+  role: role,
+),
       );
       await _saveAuthData(response);
       return Right(response.user);
@@ -104,11 +104,12 @@ class AuthRepositoryImpl implements AuthRepository {
       );
 
       await Future.wait([
-        _secureStorage.saveToken(response.token),
-        _secureStorage.saveUserId(response.user.id),
-        _secureStorage.saveUserRole(response.user.role),
-        _secureStorage.saveLoginTimestamp(DateTime.now()),
-      ]);
+  _secureStorage.saveToken(response.token),
+  _secureStorage.saveUserId(response.user.id),
+  _secureStorage.saveUserRole(response.user.role),
+  _secureStorage.saveLoginTimestamp(DateTime.now()),
+  _secureStorage.saveUserJson(jsonEncode(response.user.toJson())),
+]);
 
       return Right(response.user);
     } on DioException catch (e) {

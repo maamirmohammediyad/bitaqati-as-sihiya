@@ -66,8 +66,10 @@ class Hospital extends Model
             ->withPivot(['id', 'role', 'is_active', 'joined_at'])
             ->withTimestamps();
     }
+
 public function hospitalUsers(): HasMany
 {
     return $this->hasMany(HospitalUser::class, 'hospital_id');
 }
+
 }

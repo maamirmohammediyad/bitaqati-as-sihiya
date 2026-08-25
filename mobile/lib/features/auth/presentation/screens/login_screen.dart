@@ -11,7 +11,7 @@ import 'package:bitaqati_as_sihiya/core/utils/validators.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/providers/auth_provider.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/widgets/role_selector.dart';
 import 'package:bitaqati_as_sihiya/features/auth/presentation/screens/register_patient_screen.dart';
-
+import 'package:bitaqati_as_sihiya/features/auth/presentation/screens/account_recovery_request_screen.dart';
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -46,9 +46,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                user.isGuardian
-                    ? 'تم تسجيل الدخول كولي بنجاح'
-                    : 'تم تسجيل الدخول كمريض بنجاح',
+                user.isHealthWorker
+    ? 'تم تسجيل الدخول كموظف صحة بنجاح'
+    : user.isGuardian
+        ? 'تم تسجيل الدخول كولي بنجاح'
+        : 'تم تسجيل الدخول كمريض بنجاح',
               ),
               backgroundColor: Colors.green,
             ),
@@ -60,6 +62,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     context.go('/patient/home');
   } else if (user.isGuardian) {
     context.go('/guardian/home');
+  } else if (user.isHealthWorker) {
+    context.go('/staff/home');
   }
 });
         },
@@ -144,7 +148,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {},
+                      onPressed: () => context.push('/account-recovery'),
                       child: Text(
                         localizations.forgotPassword,
                         style: AppTextStyles.link,
@@ -152,6 +156,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  TextButton.icon(
+  onPressed: () => context.go('/staff/login'),
+  icon: const Icon(Icons.local_hospital_outlined),
+  label: const Text('دخول موظفي الصحة'),
+),
                   // Login Button
                   AppButton(
                     label: _selectedRole == 'patient'

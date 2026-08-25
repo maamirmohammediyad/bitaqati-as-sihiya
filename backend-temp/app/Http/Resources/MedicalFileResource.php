@@ -25,8 +25,24 @@ class MedicalFileResource extends JsonResource
             'size_bytes' => $this->size_bytes,
             'mime_type' => $this->mime_type,
 
-            'url' => $this->storage_path
-                ? Storage::disk('public')->url($this->storage_path)
+            'url' => null,
+
+            
+            'hospital_id' => $this->hospital_id
+                ? (string) $this->hospital_id
+                : null,
+
+            'uploaded_by' => $this->uploaded_by
+                ? [
+                    'id' => (string) $this->uploaded_by,
+
+                    // لا نصل إلى name إلا إذا كانت علاقة uploader محملة وموجودة.
+                    'name' => $this->when(
+                        $this->resource->relationLoaded('uploader') &&
+                            $this->resource->uploader !== null,
+                        fn () => $this->resource->uploader->name,
+                    ),
+                ]
                 : null,
 
             'created_at' => $this->created_at?->toIso8601String(),

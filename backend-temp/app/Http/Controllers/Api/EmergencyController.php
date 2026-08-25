@@ -93,82 +93,17 @@ public function checkIn(Request $request, string $id): JsonResponse
         ], 403);
     }
 
-    $updated = EmergencyEvent::query()
-        ->whereKey($id)
-        ->where('status', 'active')
-        ->update([
-            'status' => 'checked_in',
-            'checked_in_hospital_id' => $hospitalId,
-            'checked_in_at' => now(),
-        ]);
-
-    if ($updated === 0) {
-        $exists = EmergencyEvent::query()
-            ->whereKey($id)
-            ->exists();
-
-        return response()->json([
-            'message' => $exists
-                ? 'لا يمكن تسجيل وصول هذه الحالة لأنها سُجلت أو أُغلقت مسبقًا.'
-                : 'حالة الطوارئ غير موجودة.',
-        ], $exists ? 422 : 404);
-    }
-
     $event = EmergencyEvent::query()
         ->with([
             'user:id,name,phone,patient_code',
             'checkedInHospital:id,name,phone,address,city',
         ])
-        ->findOrFail($id);
-
-    return response()->json([
-        'message' => 'تم تسجيل وصول المريض بنجاح.',
-        'data' => new EmergencyEventResource($event),
-    ]);
-}
-
-public function resolveByHospital(
-    ResolveHospitalEmergencyRequest $request,
-    string $id,
-): JsonResponse {
-    $hospitalId = $request->attributes->get('hospital_id');
-
-    if ($hospitalId === null) {
-        return response()->json([
-            'message' => 'تعذر تحديد المستشفى.',
-        ], 403);
-    }
-
-    $updated = EmergencyEvent::query()
-        ->whereKey($id)
-        ->where('status', 'checked_in')
-        ->where('checked_in_hospital_id', $hospitalId)
-        ->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-            'resolved_by' => $request->user()->id,
-            'resolution_notes' => $request->validated('resolution_notes'),
-        ]);
-
-    if ($updated === 0) {
-    $event = EmergencyEvent::query()->find($id);
+        ->find($id);
 
     if ($event === null) {
         return response()->json([
             'message' => 'حالة الطوارئ غير موجودة.',
         ], 404);
-    }
-
-    if ($event->checked_in_hospital_id === null) {
-        return response()->json([
-            'message' => 'يجب تسجيل وصول الحالة إلى مستشفى أولًا.',
-        ], 422);
-    }
-
-    if ($event->checked_in_hospital_id !== $hospitalId) {
-        return response()->json([
-            'message' => 'لا تملك صلاحية إنهاء حالة تابعة لمستشفى آخر.',
-        ], 403);
     }
 
     if ($event->status === 'resolved') {
@@ -177,22 +112,91 @@ public function resolveByHospital(
         ], 422);
     }
 
+    if ($event->status === 'checked_in') {
+        if ($event->checked_in_hospital_id !== $hospitalId) {
+            return response()->json([
+                'message' => 'تم تسجيل وصول الحالة في مستشفى آخر.',
+            ], 403);
+        }
+
+        return response()->json([
+            'message' => 'تم تسجيل وصول المريض مسبقًا.',
+            'data' => new EmergencyEventResource($event),
+        ]);
+    }
+
+    if ($event->status !== 'active') {
+        return response()->json([
+            'message' => 'الحالة ليست نشطة ولا يمكن تسجيل وصولها.',
+        ], 422);
+    }
+
+    $event->update([
+        'status' => 'checked_in',
+        'checked_in_hospital_id' => $hospitalId,
+        'checked_in_at' => now(),
+    ]);
+
     return response()->json([
-        'message' => 'الحالة ليست في مرحلة تسمح بإنهائها.',
-    ], 422);
+        'message' => 'تم تسجيل وصول المريض بنجاح.',
+        'data' => new EmergencyEventResource(
+            $event->fresh([
+                'user:id,name,phone,patient_code',
+                'checkedInHospital:id,name,phone,address,city',
+            ]),
+        ),
+    ]);
 }
 
-    $event = EmergencyEvent::query()
-        ->with([
-            'user:id,name,phone,patient_code',
-            'checkedInHospital:id,name,phone,address,city',
-            'resolver:id,name',
-        ])
-        ->findOrFail($id);
+public function resolveByHospital(
+    Request $request,
+    EmergencyEvent $emergency
+): JsonResponse {
+    $validated = $request->validate([
+        'resolution_notes' => ['nullable', 'string', 'max:5000'],
+    ]);
+
+    $hospitalId = $request->attributes->get('hospital_id');
+
+    if ($hospitalId === null) {
+        return response()->json([
+            'message' => 'تعذر تحديد المستشفى.',
+        ], 403);
+    }
+
+    if ((string) $emergency->checked_in_hospital_id !== (string) $hospitalId) {
+        return response()->json([
+            'message' => 'هذه الحالة غير تابعة لمستشفاك.',
+        ], 403);
+    }
+
+    if ($emergency->status === EmergencyStatus::Resolved || $emergency->resolved_at !== null) {
+        return response()->json([
+            'message' => 'تم تأكيد وصول هذه الحالة مسبقًا.',
+            'data' => new EmergencyEventResource(
+                $emergency->load(['user', 'checkedInHospital', 'resolver'])
+            ),
+        ]);
+    }
+
+    if ($emergency->status !== EmergencyStatus::CheckedIn) {
+        return response()->json([
+            'message' => 'لا يمكن تأكيد وصول الحالة قبل تسجيل دخولها للمستشفى.',
+        ], 422);
+    }
+
+    $emergency->update([
+        'status' => EmergencyStatus::Resolved,
+        'resolved_at' => now(),
+        'resolved_by' => $request->user()->id,
+        'resolution_notes' => $validated['resolution_notes'] ?? null,
+    ]);
 
     return response()->json([
-        'message' => 'تم إنهاء حالة الطوارئ بنجاح.',
-        'data' => new EmergencyEventResource($event),
+        'message' => 'تم تأكيد وصول الحالة وإنهاؤها بنجاح.',
+        'data' => new EmergencyEventResource(
+            $emergency->fresh()->load(['user', 'checkedInHospital', 'resolver'])
+        ),
     ]);
 }
 
