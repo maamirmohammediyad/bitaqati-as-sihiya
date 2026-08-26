@@ -1,59 +1,244 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Bitaqati As-Sihiya — Backend API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Overview
 
-## About Laravel
+Bitaqati As-Sihiya (DZ-Health TECH) is a digital healthcare system that provides services for patients, guardians, and healthcare facilities.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+This directory contains the Laravel backend of the system. It provides the API used by the mobile application and the web dashboard and handles authentication, user access, healthcare-related data, hospital operations, and other core system services.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Main Responsibilities
 
-## Learning Laravel
+The backend provides services for:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- Patient and guardian registration.
+- User authentication and logout.
+- User profile management.
+- Password reset and account recovery.
+- Account verification documents.
+- Patient medical information.
+- Patient medications and hospital medications.
+- Hospital management and hospital staff.
+- Hospital patient management.
+- Medical records.
+- Emergency-related services.
+- Patient QR code functionality.
+- Hospital patient QR functionality.
+- Notifications.
+- Audit logging.
+- File and document storage.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+These capabilities are implemented through the API routes and the corresponding controllers and services in the application.
 
-## Laravel Sponsors
+---
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+User Roles
 
-### Premium Partners
+The system supports healthcare-related users with different responsibilities and access levels.
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+Patient
 
-## Contributing
+Patients can register and authenticate through the API and access the healthcare services and information available to their account.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Guardian
 
-## Code of Conduct
+Guardians can register and authenticate and access the services associated with their role.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Healthcare Staff
 
-## Security Vulnerabilities
+Healthcare staff operate within healthcare facilities and include:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- Hospital Administrator
+- Doctor
+- Receptionist
+- Nurse
 
-## License
+The backend provides hospital, staff, patient, medical-file, medication, and dashboard-related API endpoints to support healthcare facility operations.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+API
+
+The backend provides HTTP API endpoints consumed by the system's client applications.
+
+The API includes public endpoints such as:
+
+- Patient registration
+- Guardian registration
+- Login
+- Password reset
+- Account recovery
+
+Authenticated endpoints are protected using Laravel Sanctum.
+
+The API also provides endpoints related to:
+
+- Authentication and profiles
+- Patients
+- Hospitals
+- Hospital staff
+- Medical files and records
+- Medications
+- Emergency services
+- QR-based services
+- Account verification
+
+---
+
+Architecture
+
+The backend is organized into several application layers and components.
+
+Controllers
+
+Controllers handle incoming API requests and coordinate the corresponding application operations.
+
+The project includes controllers for authentication, patients, hospitals, medical profiles, medications, emergency services, QR functionality, hospital dashboards, and other system operations.
+
+Domain
+
+The "app/Domain" directory contains:
+
+- Actions
+- Enums
+- Models
+
+This structure is used to organize domain-related logic and application entities.
+
+Services
+
+The backend includes dedicated services for specific operations, including:
+
+- "AuditLogService"
+- "FCMService"
+- "SupabaseStorageService"
+
+These services isolate reusable functionality related to audit logging, Firebase Cloud Messaging, and Supabase storage.
+
+---
+
+Authentication
+
+Authentication is implemented using Laravel Sanctum.
+
+Authenticated API routes use the "auth:sanctum" middleware to protect access to private operations.
+
+The backend also provides functionality for:
+
+- Login
+- Logout
+- Password reset
+- Password update
+- Account recovery
+- Profile management
+
+---
+
+Technologies
+
+The backend is built with:
+
+- PHP 8.2+
+- Laravel 12
+- Laravel Sanctum
+- Geocoder PHP
+- Google Maps Geocoder Provider
+- Guzzle HTTP Factory
+
+Development and testing tools include:
+
+- PHPUnit
+- Laravel Pint
+- Laravel Sail
+- Faker
+- Mockery
+
+These dependencies are defined in the project's "composer.json".
+
+---
+
+External Services
+
+The backend contains dedicated services for:
+
+- Firebase Cloud Messaging (FCM) for notifications.
+- Supabase Storage for storage-related operations.
+- Google Maps Geocoding through the configured geocoder packages.
+
+The corresponding service implementations are located in "app/Services".
+
+---
+
+Testing
+
+The project includes a Laravel testing setup using PHPUnit.
+
+The backend also defines a Composer test script that runs the Laravel test suite:
+
+composer test
+
+---
+
+Project Structure
+
+backend-temp/
+├── app/
+│   ├── Domain/
+│   │   ├── Actions/
+│   │   ├── Enums/
+│   │   └── Models/
+│   ├── Http/
+│   │   └── Controllers/
+│   └── Services/
+├── bootstrap/
+├── config/
+├── database/
+├── public/
+├── resources/
+├── routes/
+├── storage/
+├── tests/
+├── artisan
+├── composer.json
+└── phpunit.xml
+
+---
+
+Setup
+
+Make sure PHP 8.2+, Composer, and the required project dependencies are installed.
+
+Install PHP dependencies:
+
+composer install
+
+Create the environment file:
+
+cp .env.example .env
+
+Generate the Laravel application key:
+
+php artisan key:generate
+
+Configure the required environment variables in ".env", then run the database migrations:
+
+php artisan migrate
+
+The project also provides Composer scripts for setup, development, and testing.
+
+---
+
+Development
+
+The project defines a development script that starts the Laravel server, queue listener, log viewer, and Vite development process together:
+
+composer run dev
+
+---
+
+Project Goal
+
+The backend serves as the central API layer of Bitaqati As-Sihiya, connecting the mobile application and web dashboard with the system's healthcare data and services.
+
+Its main purpose is to provide a structured backend for authentication, role-based access, patient and hospital operations, medical information, emergency services, QR functionality, notifications, and related healthcare operations.
