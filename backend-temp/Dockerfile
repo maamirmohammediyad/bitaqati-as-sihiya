@@ -38,10 +38,10 @@ RUN composer install \
     --no-dev \
     --prefer-dist \
     --no-interaction \
-    --no-progress \
     --optimize-autoloader \
-    --no-scripts
-
+    --no-scripts \
+    -vvv
+    
 RUN mkdir -p \
     storage/framework/cache \
     storage/framework/sessions \
