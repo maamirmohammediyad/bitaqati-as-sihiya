@@ -30,14 +30,17 @@ RUN docker-php-ext-install \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+# نسخ ملفات المشروع أولاً
 COPY . .
 
+# تثبيت dependencies بدون تشغيل Laravel scripts أثناء التثبيت
 RUN composer install \
     --no-dev \
     --prefer-dist \
     --no-interaction \
     --no-progress \
-    --optimize-autoloader
+    --optimize-autoloader \
+    --no-scripts
 
 RUN mkdir -p \
     storage/framework/cache \
@@ -48,6 +51,6 @@ RUN mkdir -p \
 
 RUN chmod -R 775 storage bootstrap/cache
 
-EXPOSE 10000
+ENV PORT=10000
 
-CMD ["sh", "-c", "php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-10000}"]
+CMD sh -c "php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT}"
