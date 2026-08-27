@@ -24,7 +24,7 @@ class GuardianPatientMedicalFilesScreen extends ConsumerStatefulWidget {
 
 class _GuardianPatientMedicalFilesScreenState
     extends ConsumerState<GuardianPatientMedicalFilesScreen> {
-  static const String _serverUrl = 'http://192.168.1.33:8000';
+  static const String _serverUrl = 'http://192.168.1.40:8000';
 
   bool _isUploading = false;
 
