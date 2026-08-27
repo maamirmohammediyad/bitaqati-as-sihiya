@@ -30,26 +30,24 @@ RUN docker-php-ext-install \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# نسخ ملفات المشروع أولاً
-COPY . .
+COPY composer.json composer.lock ./
 
-# تثبيت dependencies بدون تشغيل Laravel scripts أثناء التثبيت
 RUN composer install \
     --no-dev \
     --prefer-dist \
     --no-interaction \
+    --no-progress \
     --optimize-autoloader \
-    --no-scripts \
-    -vvv
-    
-RUN mkdir -p \
+    --no-scripts
+
+COPY . .
+
+RUN mkdir -p bootstrap/cache \
     storage/framework/cache \
     storage/framework/sessions \
     storage/framework/views \
     storage/logs \
-    bootstrap/cache
-
-RUN chmod -R 775 storage bootstrap/cache
+    && chmod -R 775 storage bootstrap/cache
 
 ENV PORT=10000
 
