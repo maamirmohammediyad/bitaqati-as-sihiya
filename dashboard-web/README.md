@@ -1,65 +1,76 @@
-Bitaqati As-Sihiya — Web Dashboard
+# Bitaqati As-Sihiya — Web Dashboard
 
-Overview
+## Overview
 
-Bitaqati As-Sihiya (DZ-Health TECH) is a digital healthcare platform designed to organize healthcare information and services and connect patients, guardians, and healthcare facilities through a unified system.
+Bitaqati As-Sihiya (DZ-Health TECH) is a digital healthcare platform designed
+to organize healthcare information and services and connect patients, guardians,
+healthcare staff, and healthcare facilities through a unified system.
 
-This directory contains the Web Dashboard, which provides management interfaces for both the Platform Owner and Hospital Administrators.
+This directory contains the Web Dashboard, which provides administrative
+interfaces for the **Platform Owner** and **Hospital Administrators**.
 
-The dashboard communicates with the Laravel backend through APIs and provides access to functionality according to the authenticated user's role and permissions.
+The dashboard communicates with the Laravel backend through HTTP API requests
+and provides functionality according to the authenticated user's role and
+permissions.
 
 ---
 
-Dashboard Roles
+## Dashboard Roles
 
 The Web Dashboard provides two main administrative levels:
 
 - Platform Owner
 - Hospital Administrator
 
-Each level has its own responsibilities and access to different parts of the platform.
+Each administrative level has its own responsibilities and access scope.
 
 ---
 
-1. Platform Owner Dashboard
+## 1. Platform Owner Dashboard
 
-The Platform Owner is responsible for managing and monitoring the platform at the system level.
+The Platform Owner manages the platform at the system level.
 
-The Platform Owner dashboard provides access to platform-wide operations, including:
+The Platform Owner dashboard includes the following areas:
 
-Dashboard
+### Dashboard
 
 Provides an overview of the platform and its main administrative information.
 
-Users
+### Users
 
 Provides access to user management across the platform.
 
-Hospitals
+### Hospitals
 
 Provides functionality for managing and monitoring registered hospitals.
 
-Emergencies
+### Emergencies
 
 Provides access to emergency-related information across the platform.
 
-Verification Requests
+### Verification Requests
 
 Provides access to verification requests that require platform-level review.
 
-Account Recovery Requests
+### Account Recovery Requests
 
 Provides access to account recovery requests submitted through the platform.
 
-The Platform Owner dashboard is organized under the "/admin" application area.
+The Platform Owner dashboard is organized under the:
+
+```text
+/admin
+
+application area.
+
 
 ---
 
 2. Hospital Administrator Dashboard
 
-The Hospital Administrator is responsible for managing the operations and users of a specific hospital.
+The Hospital Administrator manages the operations and users of a specific hospital.
 
-The Hospital Administrator dashboard provides access to hospital-level functionality, including:
+The Hospital Administrator dashboard includes the following areas:
 
 Dashboard
 
@@ -79,39 +90,51 @@ Provides access to emergency-related information associated with the hospital.
 
 Password Settings
 
-Allows the authenticated hospital administrator to manage their password.
+Allows the authenticated Hospital Administrator to manage their password.
 
-The Hospital Administrator dashboard is organized under the "/hospital" application area.
+The Hospital Administrator dashboard is organized under the:
+
+/hospital
+
+application area.
+
 
 ---
 
 Access Control
 
-The dashboard separates platform-level and hospital-level functionality according to the authenticated user's role.
+The dashboard separates platform-level and hospital-level functionality based on the authenticated user's role.
 
 Platform Owner
 
-Has access to platform-wide management functionality.
+Has access to platform-wide administrative functionality.
 
 Hospital Administrator
 
-Has access to functionality related to their hospital.
+Has access to functionality related to their assigned hospital.
 
-This separation helps prevent users from accessing administrative operations outside the scope of their responsibilities.
+This separation helps ensure that administrative operations remain within the scope of the user's responsibilities.
+
 
 ---
 
 Authentication
 
-The dashboard includes authentication and account management functionality, including:
+The dashboard provides authentication and account-management functionality, including:
 
-- Login
-- Forgot Password
-- Reset Password
-- Account Recovery
-- Account Recovery Completion
+Login
 
-Authenticated API requests use a Bearer access token when communicating with the backend.
+Forgot Password
+
+Reset Password
+
+Account Recovery
+
+Account Recovery Completion
+
+
+Authenticated requests to the backend use a Bearer access token.
+
 
 ---
 
@@ -121,19 +144,25 @@ The Web Dashboard communicates with the Laravel backend through HTTP API request
 
 The API client:
 
-- Uses "NEXT_PUBLIC_API_URL" as the backend API base URL.
-- Uses the browser "fetch" API for HTTP requests.
-- Supports authenticated requests using a Bearer token.
-- Processes JSON responses.
-- Handles API and HTTP errors.
+Uses NEXT_PUBLIC_API_URL as the backend API base URL.
 
-The backend acts as the central API layer connecting the dashboard with the platform's data and services.
+Uses the browser fetch API for HTTP requests.
+
+Supports authenticated requests using a Bearer token.
+
+Processes JSON responses.
+
+Handles API and HTTP errors.
+
+
+The Laravel backend acts as the central API layer responsible for the application's server-side operations, authentication, authorization, and data management.
+
 
 ---
 
 Application Structure
 
-The dashboard uses the Next.js App Router structure.
+The dashboard uses the Next.js App Router.
 
 dashboard-web/
 ├── public/
@@ -177,19 +206,26 @@ dashboard-web/
 ├── tsconfig.json
 └── eslint.config.mjs
 
+
 ---
 
 Technologies
 
 The Web Dashboard is built using:
 
-- Next.js 16
-- React 19
-- TypeScript
-- Tailwind CSS 4
-- ESLint
+Next.js 16
 
-These technologies are defined in the project's "package.json".
+React 19
+
+TypeScript
+
+Tailwind CSS 4
+
+ESLint
+
+
+The project's dependencies and versions are defined in package.json.
+
 
 ---
 
@@ -199,8 +235,10 @@ Requirements
 
 Make sure the following are installed:
 
-- Node.js
-- npm
+Node.js
+
+npm
+
 
 Installation
 
@@ -210,9 +248,11 @@ npm install
 
 Environment Configuration
 
-Configure the backend API URL using the following environment variable:
+Configure the Laravel backend API URL using:
 
 NEXT_PUBLIC_API_URL=your_backend_api_url
+
+Replace your_backend_api_url with the URL of the running Laravel backend.
 
 Run the Development Server
 
@@ -230,13 +270,14 @@ Lint
 
 npm run lint
 
+
 ---
 
 Integration with the Bitaqati As-Sihiya Platform
 
 The Web Dashboard is one of the main components of the Bitaqati As-Sihiya platform.
 
-                         Bitaqati As-Sihiya
+Bitaqati As-Sihiya
                                 │
                 ┌───────────────┼───────────────┐
                 │               │               │
@@ -246,9 +287,28 @@ The Web Dashboard is one of the main components of the Bitaqati As-Sihiya platfo
                                 └───────┬───────┘
                                         │
                                         ▼
-                                    Database
+                                  PostgreSQL
 
-The Web Dashboard provides administrative interfaces, while the Laravel backend handles the central business logic, authentication, authorization, and data operations.
+The Web Dashboard provides administrative interfaces, while the Laravel backend provides the central API layer for authentication, authorization, business logic, and data operations.
+
+
+---
+
+Administrative Structure
+
+The platform follows a hierarchical administrative structure:
+
+Bitaqati As-Sihiya
+│
+├── Platform Owner
+│   └── Platform-level administration
+│
+└── Hospital
+    └── Hospital Administrator
+        └── Hospital-level administration
+
+This structure separates platform-wide management from hospital-level management.
+
 
 ---
 
@@ -256,6 +316,46 @@ Project Goal
 
 The goal of the Web Dashboard is to provide appropriate management interfaces for the different administrative levels of the Bitaqati As-Sihiya platform.
 
-The Platform Owner manages the platform at the system level, while the Hospital Administrator manages the operations and resources of their hospital.
+The Platform Owner manages the platform at the system level, while the Hospital Administrator manages the operations and resources of their assigned hospital.
 
-This separation provides a clearer and more controlled management structure for the healthcare platform.
+This separation provides a clearer and more controlled administrative structure for the healthcare platform.
+
+
+---
+
+Security Notes
+
+Sensitive configuration must not be committed to the repository.
+
+Do not expose:
+
+Database passwords
+
+API secrets
+
+Private keys
+
+Production environment files
+
+Real patient information
+
+Real medical records
+
+
+Environment-specific configuration should be provided locally.
+
+
+---
+
+Project Status
+
+The Web Dashboard is an integral component of the Bitaqati As-Sihiya platform and is currently intended for:
+
+Project demonstration
+
+Evaluation
+
+Prototype use
+
+
+Additional infrastructure, security, monitoring, and deployment work would be required before operating the platform as a production healthcare system with real patient data.
