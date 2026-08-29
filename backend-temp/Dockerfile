@@ -14,7 +14,16 @@ RUN apk add --no-cache \
     libpng-dev \
     libjpeg-turbo-dev \
     freetype-dev \
-    $PHPIZE_DEPS
+    autoconf \
+    dpkg-dev \
+    dpkg \
+    file \
+    g++ \
+    gcc \
+    libc-dev \
+    make \
+    pkgconf \
+    re2c
 
 # Configure GD
 RUN docker-php-ext-configure gd \
@@ -31,14 +40,13 @@ RUN docker-php-ext-install \
     pdo_pgsql \
     zip
 
-# Composer
+# Install Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Copy Composer files from backend-temp
-COPY backend-temp/composer.json backend-temp/composer.lock ./
+# Copy Composer files
+COPY composer.json composer.lock ./
 
-# Install Laravel dependencies
-# --no-scripts مهم حتى لا يتم تشغيل Laravel أثناء build
+# Install production dependencies
 RUN composer install \
     --no-dev \
     --prefer-dist \
@@ -47,10 +55,10 @@ RUN composer install \
     --optimize-autoloader \
     --no-scripts
 
-# Copy the Laravel application
-COPY backend-temp/ .
+# Copy Laravel application
+COPY . .
 
-# Laravel writable directories
+# Laravel directories
 RUN mkdir -p \
     bootstrap/cache \
     storage/framework/cache \
@@ -59,8 +67,11 @@ RUN mkdir -p \
     storage/logs \
     && chmod -R 775 storage bootstrap/cache
 
-# Render provides PORT automatically
-ENV PORT=10000
+# Copy startup script
+COPY start.sh /usr/local/bin/start.sh
 
-# Start Laravel
-CMD sh -c "php artisan config:cache && php artisan route:cache && php artisan serve --host=0.0.0.0 --port=${PORT}"
+# Make startup script executable
+RUN chmod +x /usr/local/bin/start.sh
+
+# Start application
+CMD ["/usr/local/bin/start.sh"]
