@@ -2,16 +2,28 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import {
+  FormEvent,
+  Suspense,
+  useMemo,
+  useState,
+} from "react";
 import { useSearchParams } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-export default function ResetPasswordPage() {
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
 
-  const token = useMemo(() => searchParams.get("token") ?? "", [searchParams]);
-  const email = useMemo(() => searchParams.get("email") ?? "", [searchParams]);
+  const token = useMemo(
+    () => searchParams.get("token") ?? "",
+    [searchParams]
+  );
+
+  const email = useMemo(
+    () => searchParams.get("email") ?? "",
+    [searchParams]
+  );
 
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
@@ -28,6 +40,11 @@ export default function ResetPasswordPage() {
 
     if (!token || !email) {
       setError("رابط إعادة التعيين غير صالح أو ناقص البيانات.");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("كلمة المرور يجب أن تحتوي على 8 أحرف على الأقل.");
       return;
     }
 
@@ -67,11 +84,14 @@ export default function ResetPasswordPage() {
         data.message ||
           "تم تغيير كلمة المرور بنجاح. يمكنك تسجيل الدخول الآن."
       );
+
       setIsSuccess(true);
       setPassword("");
       setPasswordConfirmation("");
     } catch {
-      setError("تعذر الاتصال بالخادم. تأكد من أن Laravel يعمل.");
+      setError(
+        "تعذر الاتصال بالخادم. تأكد من أن Laravel يعمل."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -117,9 +137,16 @@ export default function ResetPasswordPage() {
                 </h2>
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  أصبحت كلمة المرور الجديدة فعالة. يمكنك الآن تسجيل الدخول إلى
-                  حسابك.
+                  أصبحت كلمة المرور الجديدة فعالة. يمكنك الآن
+                  تسجيل الدخول إلى حسابك.
                 </p>
+
+                <Link
+                  href="/login"
+                  className="mt-7 inline-flex w-full justify-center rounded-xl bg-cyan-700 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-cyan-800"
+                >
+                  الانتقال إلى تسجيل الدخول
+                </Link>
               </div>
             ) : (
               <>
@@ -128,8 +155,8 @@ export default function ResetPasswordPage() {
                 </h2>
 
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  اختر كلمة مرور قوية لحماية حسابك. يجب أن تحتوي على 8 أحرف
-                  على الأقل، وحروف وأرقام.
+                  اختر كلمة مرور قوية لحماية حسابك. يجب أن تحتوي
+                  على 8 أحرف على الأقل، وحروف وأرقام.
                 </p>
 
                 {error && (
@@ -150,7 +177,10 @@ export default function ResetPasswordPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="mt-7 space-y-5">
+                <form
+                  onSubmit={handleSubmit}
+                  className="mt-7 space-y-5"
+                >
                   <div>
                     <label
                       htmlFor="password"
@@ -164,7 +194,9 @@ export default function ResetPasswordPage() {
                       name="password"
                       type="password"
                       value={password}
-                      onChange={(event) => setPassword(event.target.value)}
+                      onChange={(event) =>
+                        setPassword(event.target.value)
+                      }
                       placeholder="اكتب كلمة مرور قوية"
                       autoComplete="new-password"
                       minLength={8}
@@ -203,7 +235,9 @@ export default function ResetPasswordPage() {
 
                   <button
                     type="submit"
-                    disabled={isLoading || !token || !email}
+                    disabled={
+                      isLoading || !token || !email
+                    }
                     className="w-full rounded-xl bg-cyan-700 px-4 py-3.5 text-sm font-bold text-white transition hover:bg-cyan-800 focus:outline-none focus:ring-4 focus:ring-cyan-200 disabled:cursor-not-allowed disabled:bg-cyan-400"
                   >
                     {isLoading
@@ -226,5 +260,24 @@ export default function ResetPasswordPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <main
+          dir="rtl"
+          className="flex min-h-screen items-center justify-center bg-slate-50"
+        >
+          <div className="text-sm text-slate-600">
+            جارٍ تحميل الصفحة...
+          </div>
+        </main>
+      }
+    >
+      <ResetPasswordForm />
+    </Suspense>
   );
 }
